@@ -1,0 +1,45 @@
+<?PHP
+
+function exchange(&$a,&$b){
+  $a^=$b;
+  $b^=$a;
+  $a^=$b;
+}
+
+$a=0;
+$b=9;
+exchange($a,$b);
+echo $a."\n".$b;
+//output:
+//9
+//0
+
+
+//交换数组的值
+//数组的换序列化后交换就行；
+$array_a=[1,2,3,4];
+$array_b=[6,7,8,9];
+$array_a=serialize($array_a);
+$array_b=serialize($array_b);
+
+exchange($array_a,$array_b);
+
+$array_a=unserialize($array_a);
+$array_b=unserialize($array_b);
+
+var_dump($array_a);
+var_dump($array_b);
+
+//output:
+/*
+array (size=4)
+  0 => int 6
+  1 => int 7
+  2 => int 8
+  3 => int 9
+array (size=4)
+  0 => int 1
+  1 => int 2
+  2 => int 3
+  3 => int 4
+  */
