@@ -1,19 +1,30 @@
-You can do the following:
+#You can do the following:
 
 sudo apt-get install python-software-properties
 sudo LC_ALL=C.UTF-8 add-apt-repository ppa:ondrej/php
 sudo apt-get update
-Optionally purge PHP 5:
+#Optionally purge PHP 5:
 
 sudo apt-get remove php5-common -y
-Or directly purge it including configuration files:
+#Or directly purge it including configuration files:
 
 sudo apt-get purge php5-common -y
-And finally install PHP 7:
+#And finally install PHP 7:
 
-sudo apt-get install php7.0 php7.0-fpm php7.0-mysql -y
-Optionally clean up unneeded packages afterwards:
+sudo apt-get install php7.0 php7.0-fpm php7.0-mysql libapache2-mod-php7.0 -y
+#Optionally clean up unneeded packages afterwards:
+
+#libapache2-mod-php7.0 apache模块libphp7.so
 
 sudo apt-get --purge autoremove -y
+
+
+phpmyadmin
+cd /var/www/html/
+sudo wget https://files.phpmyadmin.net/phpMyAdmin/4.5.3.1/phpMyAdmin-4.5.3.1-all-languages.zip
+sudo unzip phpMyAdmin-4.5.3.1-all-languages.zip
+sudo mv phpMyAdmin-4.5.3.1-all-languages/ phpmyadmin/
+sudo mkdir -m 777 phpmyadmin/config/
+sudo /etc/init.d/apache2 restart
 
 参考：http://askubuntu.com/questions/705880/how-to-install-php-7
