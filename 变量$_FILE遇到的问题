@@ -1,1 +1,28 @@
 I spent 3 hours trying to find out why when I upload multiples file $_FILES  return empty, I did noticed it was only when I select files that exceed 3m so I thought it was something related to the MAX_UPLOAD_SIZE that for my surprice came as default as 20m which was very confusing. Later I discovery the problem was in the POST_MAX_SIZE been 3m, so it happen that not only MAX_UPLOAD_SIZE is responsible and that is why I'd like to know there is no error message that shows the cause.
+
+
+$_FILES['userfile']['error'].
+
+UPLOAD_ERR_OK
+Value: 0; There is no error, the file uploaded with success.
+
+UPLOAD_ERR_INI_SIZE
+Value: 1; The uploaded file exceeds the upload_max_filesize directive in php.ini.
+
+UPLOAD_ERR_FORM_SIZE
+Value: 2; The uploaded file exceeds the MAX_FILE_SIZE directive that was specified in the HTML form.
+
+UPLOAD_ERR_PARTIAL
+Value: 3; The uploaded file was only partially uploaded.
+
+UPLOAD_ERR_NO_FILE
+Value: 4; No file was uploaded.
+
+UPLOAD_ERR_NO_TMP_DIR
+Value: 6; Missing a temporary folder. Introduced in PHP 5.0.3.
+
+UPLOAD_ERR_CANT_WRITE
+Value: 7; Failed to write file to disk. Introduced in PHP 5.1.0.
+
+UPLOAD_ERR_EXTENSION
+Value: 8; A PHP extension stopped the file upload. PHP does not provide a way to ascertain which extension caused the file upload to stop; examining the list of loaded extensions with phpinfo() may help. Introduced in PHP 5.2.0.
