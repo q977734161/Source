@@ -1,0 +1,252 @@
+apache配置笔记
+
+1.日志处理
+	a.ErrorLog
+		格式：ErrorLog 文件路径
+			ErrorLog "logs/error.log"
+	b.定义日志格式
+		格式：LogFormat format|nickname [nickname]
+			LogFormat "%h %l %u %t \"%r\" %>s %b" common
+		格式说明：
+			%%		百分号
+			%a 		远端IP地址
+			%A 		本机IP地址
+			%B 		除HTTP头以外传送的字节数
+			%b 		以CLF格式显示的除HTTP头以外传送的字节数，也就是当没有字节传送时显示'-',而不是'0'
+			%{Foobar}C 		在请求中传送给服务器端的cookieFoobar的内容
+			%D 		服务器处理本请求所用的时间，以微秒为单位
+			%{Foobar}e 		环境变量FOOBAR的值
+			%f 		文件名
+			%h 		远端主机
+			%H 		请求使用的协议
+			%{Foobar}i 		发送到服务器的请求头Foobar:的内容
+			%l 		远端登录名
+			%m 		请求的方法
+			%{Foobar}n 		来自另一个模块的注解Foobar的内容
+			%{Foobar}o 		应答头Foobar的内容
+			%p 		服务器服务于该请求的标准端口
+			%P 		为本次请求服务的子线程的PID
+			%{format}P 服务于该请求的PID或TID
+			%q 		查询字符串(若存在则由一个'?'引导，否则返回空串)
+			%r 		请求的第一行
+			%s 		状态。对于内部重定向的请求，这个状态指的是原始请求的状态，--%>s则是指最后的请求状态
+			%t 		时间，用普通日志的标准时间格式
+			%{format}t 		时间，用strftime(3)指定的格式表示时间，默认情况下按本地化格式
+			%T 		处理完所有请求所用的时间安，秒为单位
+			%u 		远程登录用户名
+			%U 		请求的URL路径，不包含查询字符串
+			%v 		对该请求服务的标准ServerName
+			$V 		根据UserCanonocalName指令设置的服务器名称
+			%X 		请求完成时的链接状态：X=链接在应答完成前中断，+=应答传送完成后继续保持链接，-=应答传送完成后关闭链接
+			%l 		接收的字节数，包括请求头的数据，并且不能为零，要使用这个指令必须启用mod_logio模块
+			%O 		发送的字节数，包括请求头的数据，并且不能为零，要使用这个指令必须启用mod_logio模块
+	c.LogLevel日志级别
+		级别说明：
+			emerg 		紧急（服务器无法使用）
+			alert		必须立即采取措施
+			crit		致命情况
+			error 		错误情况
+			warn 		警告情况
+			notice		一般重要情况
+			info		普通信息
+			debug		调试信息
+	d.自定义日志
+		格式
+			CustomLog file|pipe format|nickname [env=[!]environment-variable]
+2.虚拟主机的设置
+	a.基于主机名的虚拟主机格式
+		<VirtualHost ip:port>
+		</VirtualHost>
+
+		<VirtualHost *:80>
+			ServerName a.com
+			ServerAlias a_alias.com
+			DocumentRoot /var/www/html
+		</VirtualHost>
+
+		说明：
+			如果一个ip:port配置多个虚拟主机需要NameVirtualHost指令,否则永远访问到第一个
+			NameVirtualHost *:80
+			<VirtualHost *:80>
+				ServerName a.com
+				ServerAlias a_alias.com
+				DocumentRoot /var/www/html/q
+			</VirtualHost>
+			<VirtualHost *:80>
+				ServerName b.com
+				ServerAlias b_alias.com
+				DocumentRoot /var/www/html/b
+			</VirtualHost>
+	b.基于IP的虚拟主机格式
+		NameVirtualHost ip
+		<VirtualHost ip>
+		</VirtualHost>
+
+		NameVirtualHost 192.168.1.12
+		NameVirtualHost 192.168.1.13
+		<VirtualHost 192.168.1.12>
+			ServerName a.com
+			ServerAlias a_alias.com
+			DocumentRoot /var/www/html
+		</VirtualHost>
+		<VirtualHost 192.168.1.13>
+			ServerName a.com
+			ServerAlias a_alias.com
+			DocumentRoot /var/www/html
+		</VirtualHost>
+		可以使用不同IP访问相同的内容
+
+3.URL重写
+	a.开启模块
+		打开配置文件httpd.conf
+		将#LoadModel rewrite_module modules/mod_rewrite.so前面的#去掉
+	b.在网站跟路目录下创建.htaccess文件
+		文件内容：
+			#开启重写引擎
+			RewriteEngine On
+			#重写URL规则
+			RewriteRule ^old\.html$ new.html
+		将访问old.html的链接重新定位到new.html
+	c.常用指令
+		1.RewriteEngine指令
+			开启或关闭URL重写引擎
+			语法：
+				RewriteEngine on|off
+		2.RewriteBase指令
+			指定设置URL重写的根目录。默认是.htaccesss文件所在根目录
+			语法：
+				RewriteBase URL-path
+		3.RewriteCond指令
+			定义重写规则条件，在一个R二维日特Rule指令之前可以有一个活多个RewriteCond指令，重写规则仅在当前URI与Patten匹配并且满足此条件时才会起作用。
+			语法：
+				RewriteCond TestString CondPattern [flags]	
+				说明：
+					TestString是一个纯文本的字符串，还可以包括下列的扩展部分：
+					(1)RewriteRule反向引用
+						引用形式：$N(0<=N<=9).引用当前（带有若干RewriteRule指令的）RewriteCond中			与pattern匹配的分组成分。
+						例如：
+							将http://www.username.domain.com/anypath 到 /home/username/anypath
+							
+							Rewriteengine on
+							rewritecond %{HTTP_HOST} ^www\.[^.]+\.host\.com$
+							rewriterule ^(.+) %{HTTP_HOST}$1 [C]
+							rewriterule ^www\.([^.]+)\.host\.com(.*) /home/$1$2
+					（2）RewriteCond反向引用
+						引用形式：%N(0<=N<=9).引用当前RewriteCond条件中最后一个与pattern匹配的分			组部分提供的引用形式。
+						例如：
+							给子域名加www标记 
+								RewriteCond %{HTTP_HOST} ^([a-z.]+)?example\.com$ [NC] 
+								RewriteCond %{HTTP_HOST} !^www\. [NC] 
+								RewriteRule .? http://www.%1example.com%{REQUEST_URI} [R=301,L] 
+					（3）服务器变量
+						引用形式：%{NAME_OF_VARIABLE},NAME_OF_VARIABLE可以是下列			的任意一个字符串
+
+								|变量分类|					|变量名列表|
+						-----------------------------------------------------							     HTTP_USER_AGENT
+														HTTP_REFERER
+														HTTP_COOKIE
+								HTTP头					HTTP_FORWARDED
+														HTTP_POST
+														HTTP_PROXY_CONNECTION
+														HTTP_ACCEPT
+						-----------------------------------------------------
+														REMOTE_ADDR
+														REMOTE_HOST
+														REMOTE_PORT
+														REMOTE_USER
+								连接与请求				REMOTE_INDENT
+														REQUEST_METHOD
+														SCRIPT_FILENAME
+														PATH_INFO
+														QUERY_STRING
+														AUTH_TYPE
+						-----------------------------------------------------
+														DOCUMENT_ROOT
+														SERVER_ADMIN
+														SERVER_NAME
+								服务器内部				SERVER_ADDR
+														SERVER_PORT
+														SERVER_PROTOCOL
+														SERVER_SOFTWARE
+						-----------------------------------------------------
+														TIME_YEAR
+														TIME_MON
+														TIME_DAY
+								日期与时间				TIME_HOUR
+														TIME_MIN
+														TIME_SEC
+														TIME_WDAY
+														TIME
+						-----------------------------------------------------
+														API_VERSION
+														THE_REQUEST
+								mod_rewrite模块特有		QEQUEST_URI
+														REQUEST_FILENAME
+														IS_SUBREQ
+														HTTPS
+						-----------------------------------------------------
+
+						注意以下几点：
+							1）.变量SCRIPT_FILENAME和REQUEST_FILENAME包含的值是相同的，即apache服务器内部的request_rec结构中的filename字段的值。第一个变量也称为CGI变量名，而第二个变量恰好也对应的是REQUEST_URI
+							2).%{ENV:variable}中的variable可以是任意环境变量，可通过查找Apache内部结构或者通过函数getenv()从Apache服务器进程中来获得。
+							3）.%{SSL:variable}中的variable可以是一个SSL环境变量的名字，无论是否加载mod_ssl模块都可以用，如果没有加载，则为空字符串，比如%{SSL:SSL_CIPHER_USERKEYSIZE}将会演变成128.
+							4）.%{HTTP:header}z中的header可以是任意HTTP MIME头的名称，可以发送一个HTTP请求来获取，比如%{HTTP:Proxy-Connection}是HTTP header Proxy-Connection的值。
+							5).%{LA-U:variable}可以用于查找在执行一个内部（给予URL的）子请求后确定的最终值，可以用于重写一个目前未知但是会在之后过程中设置的变量。例如，需要在服务器级的配置（http.conf文件）中根据REMOTE_USER变量进行重写，就必须使用%{LA_U:REMOTE_USER},因为此变量是在URL重写操作之后的授权阶段设置的。另一方面，因为mod_rewrite是在API命名修正截断实现对目录级(.htaccess)的配置的，而授权阶段优于此阶段，所以在这种情况下使用%{REMOTR_USER}.
+							6).%{LA-F:variable}用于在执行一个内部(基于文件名的)子请求后确定变量的最终值。在大多情况下，与上述的LA-U是相同的。
+							7）.CondPattern是一个条件模板，即一个与TestString进行匹配的正则表达式，他是一个与Perl兼容的正则表达式，它有如下两个特点：
+								*>可以给模式字符串加一个"!"前缀，指定一个非匹配模式。
+								*>有一些特殊的CondPattern变种，他们并不是真正的正则表达式字符串，主要有如下形式：
+									--'<CondPattern':小于字符串CondPattern。将CondPattern作为一个普通的字符串并与TestString根据字典顺序进行比较，如果TestString小于CondPattern，则为真。
+									--'>CondPattern':大于字符串CondPattern。将CondPattern作为一个普通的字符串并与TestString根据字典顺序进行比较，如果TestString大于CondPattern，则为真。
+									--'=CondPattern':等于字符串CondPattern。将CondPattern作为一个普通的字符串并与TestString根据字典顺序进行比较，如果TestString等于CondPattern，则为真。
+									--'-d':判断是否是目录。把TestString作为一个路径名并测试它是否为一个已存在的目录。
+									--'-f':判断是否是文件。把TestString作为一个路径名并测试它是否为一个已存在的文件。
+									--'-s':判断是否为非空的文件。把TestString作为一个路径名并测试他是否为一个已存在的且大小大于0的文件。
+									--'-l':判断是否为符号链接。把TestString作为一个路径名并测试他是否为一个已存在的符号链接。
+									--'-x':判断是否为有可执行权限的文件，把TestString作为一个路径名并测试它是否为一个已存在的并且具有可执行权限的文件。该权限由操作系统检测。
+									--'-F':判断是否是通过子请求访问存在的文件。检查TestString是否为一个有效的文件，而且可以在服务器当前的访问控制配置下被访问。它使用一个内部子请求来做检查，由于会降低服务器的性能，所以请谨慎使用！
+									--'-U':判断是否是通过子请求访问存在的URL。检查TestString是否为一个有效的URL，而且可以在服务器在当前的访问控制配置下被访问。它是用一个内部子请求来做检查，由于会降低服务器的性能，所以谨慎使用！
+					（3）.flags标记
+						多个标记之间可以用逗号分隔。
+						只有两个标记：
+							NC：不区分大小写
+							OR：与下一个条件建立或的关系
+
+		4.RewriteRule指令
+			语法：
+				RewriteRule Pattern Substition [flags]
+
+				Pattern用于重写当前URL的正则表达式，Substitution是与Pattern匹配成功后用来替换字符串。除纯文本外，还包括：
+					（1）对Pattern的反向一用($N).
+					（2）对最后匹配的RewriteCond的反向引用(%N).
+					（3）规则条件测试字符串（%{VARNAME}）中的服务器变量。
+				flags
+					用于重写规则标记，多个标记之间用半角逗号(,)分隔。相关参数如下所示.
+					（1）C：用于关联下一条规则。如果当前规则匹配成功，则该标记不起作用，否则与之关联的规则都会被跳过而不进行匹配。
+					（2）CO=NAME:VAL:domain[:lifetime["path"]]:用户在客户端设置一个cookie.NAME是cookie的名称，VAL是cookies的值，domain是cookie的域，lifetime是cookie的有效期，path是cookie的路径。
+					（3）E=VAR:VAL:用于设置环境变量。VAR是变量名，VAL是变量的值。
+					（4）F:用于强制禁止当前URL，反馈一个HTTP响应码403（被禁止的）。
+					（5）G:用于强制放弃当前URL,反馈一个HTTP响应码410（以放弃的）。
+					（6）H:用于强制指定目标文件的内容处理器为Content-handler.
+					（7）L:用于停止重写操作，并且不再应用其他的重写规则。
+					（8）N:用于重新执行重写操作。
+					（9）NC:使用pattern忽略大小写。在Pattern与当前URL匹配时，"A-Z"和'a-z'没有区别。
+					（10）NE:用于阻止mod_rewrite对重写结果应用常规的URI转义规则。一般情况下，特殊字符('%','$',';'等)会被转义为等值的十六进制编码（'%25','%24','%3B'等），使用此标记可以阻止这些符号的转义。
+					（11）NS：用于跳过对内部子请求的重写规则。
+					（12）P：用于substitution部分在内部作为代理请求被强制发送，并终端重写处理，然后交给mod_proxy模块（mod_proxy模块必须是已启用状态）。
+					（13）PT：强制重写引擎将request_rec内部结构中的uri字段设置为filename字段值，使得RewriteRule指令的输出内容能够被Alias，ScriptAlias,Redirect等指令进行后续处理。
+					（14）QSA：强制重写引擎在已有的substition字符串中追加一个查询字符串，而不是替换它。
+					（15）R：如果Substitution的前缀是以http://thishost[:thisport]/开头的，则强制执行外部重定向。如果没有指定code，则会产生一个HTTP响应码302（临时性移动的）。如果想使用300~400范围内的其他响应吗，在此指定即可。
+					（16）S=num:强制重写引擎跳过当前规则之后的num个规则。
+					（17）T=MIME-type:强制目标文件的MIME类型。
+		5.RewriteLog指令
+			记录所有重写操作的日志文件的名称。此指令应该在每个服务器级别的配置中仅出现一次。
+			语法：
+				RewriteLog file-path
+		6.RewriteLogLevel指令
+			设置重写引擎日志的详细程度的级别。默认为0，意味着不记录；9或更大的值则以意味着记录所有操作。
+			语法：
+				RewriteLogLevel Level
+
+
+
