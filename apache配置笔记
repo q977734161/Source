@@ -248,5 +248,45 @@ apache配置笔记
 			语法：
 				RewriteLogLevel Level
 
+4.案例
+	a.防止图片盗链
+		RewriteEngine On
+		RewriteCond 	%{HTTP_REFERER} !^$ [NC]
+		RewriteCond 	%{HTTP_REFERER} !http://www.mysite.com [NC]
+		RewriteCond 	%{HTTP_REFERER} !http://www.baidu.com [NC]
+		RewriteCond 	%{HTTP_REFERER} !http://www.google.com [NC]
+		RewriteRule .*\.(gif|jpg)$ http://mysite.com/default.jpg [R,NV,L]
+5.用户访问权限设置
+	a.通过命令创建用户user1和user2，如下所示：
+		c:\Apache2.2\bin>htpasswd -c c:/Apache2.2/htaccess user1
+		c:\Apache2.2\bin>htpasswd  c:/Apache2.2/htaccess user2
+
+		使用htpasswd命令创建用户，-c指定创建一个新的文件，C:/Apache2.2/htaccess是新文件的目录，user1是用户名，创建完成后，可以到C:/Apaeche2.2目录下打开htaccess文件查看用户信息。
+	b.打开httpd.conf文件，找到下面的3个模块：
+		LoadModule auth_basic_module modules/mod_auth_basic.so
+		LoadModule auth_file_module modules/mod_auth_file.so
+		LoadModule authz_user_module modules/mod_authz_user.so
+		找到#Include conf/extra/httpd-autoindex.conf,去掉前面的注释（#）。在http-autoindex.conf中配置用胡访问权限，修改完成后保存http.conf文件。
+	c.进入conf/extra/目录，对文件http-autoindex.conf进行编辑，添加如下的代码：
+		<Directory "c:\Apache2.2/htdoc/shop/">
+			Optiond  Indexes MultiViews
+			AllowOverride None
+			Order allow,deny
+			Allow from all
+		</Directory>
+
+		<Directory "c:\Apache2.2/htdoc/shop/">
+			AuthType Basic
+			AuthName "please put into your name and password"
+			AuthUserFile C:/Apache2.2/htaccess
+			Require user user1
+		</Directory>
+
+		说明：
+			*：AuthType:指定认证类型模块，一般常用的AuthType是"Basci/Digest".这个认证需要用到认证模块mod_auth_basic/mod_auth_digest、认证支持模块mod_auth_file和认证授权模块mod_authz_user.
+			*:AuthName:指定验证登录框的提示信息。
+			*：AuthUserFile:指定验证信息文件的存放目录。
+			*：Require user:指定允许访问的用胡户，多喝用户之间用空格分隔。
+	
 
 
