@@ -1,0 +1,1029 @@
+一、启动，停止和重新加载配置
+	1.使用 -s 参数，语法规则如下:
+		nginx -s signal
+		signal值可以是如下几种值：
+			* ： stop 快速关闭
+			* ： quit 优雅关机(等待当前所有请求执行完成退出)
+			* ： reload 重新加载配置文件
+			* ： reopen 重新打开日志
+	2.可以使用kill向nginx发送信号
+		kill -s QUIT [pid(nginx进程号)]
+    TERM, INT	快速关闭
+    QUIT	从容关闭
+    HUP	重载配置
+      用新的配置开始新的工作进程
+    从容关闭旧的工作进程
+    USR1	重新打开日志文件
+    USR2	平滑升级可执行程序。
+    WINCH	从容关闭工作进程
+二、配置文件结构
+		HTTP核心模块（HTTP Core）
+			Nginx是一系列在配置文件中控制指令的模块组成。这些指令分为简单指令和块指令。
+				一个简单的指令是由空格分开的名称和参数组成，用逗号表示结束
+				一个块指令和简单指令的结构相同，但是不是以逗号结束，而是放在了{}大括号中。
+				如果一个块指令有其他的指令在大括号中，这个指令就叫做它被称为上下文（例如：events,http,server,location）
+			在配置文件中指令放在了任何上下文环境外就认为是主上下文（main content）,events和httpd指令在主上下文中,server在http中，location在Server中。
+
+			使用#注释。
+
+			1.静态内容：
+				a.创建要访问的静态资源
+					访问静态html、图片信息；
+					创建文件夹/var/www/nginx
+					创建文件index.html
+					创建图片文件夹/var/www/imgaes,放入图片
+				b.修改配置文件
+					在http块中添加Server指令
+						http{
+							server{
+
+							}
+						}
+					server 块指令有监听的端口和Server names来区分，一旦nginx决定那个Server来处理一个请求，就会将请求头只能够的URI与location指令的参数进行比较。
+
+					添加location指令到server中：
+						location /{
+							root /var/www/nginx;
+						}
+
+					location块指令会将"/"前缀和请求的URI进行比较，如果请求匹配，URI会指向root指令指向的文件夹，即/var/www/nginx本地文件。如果有很多location块匹配，nginx会选择一个最长的前缀。上面例子是最短的匹配前缀，如果其他location都不匹配，最短的这个location将会使用。
+						添加第二个location块：
+						location /images/ {
+							root /var/www;
+						}
+						匹配一个请求以/images/的；
+					到此，配置文件server块应该是这样的：
+						server {
+						    location / {
+						        root /var/www/nginx;
+						    }
+
+						    location /images/ {
+						        root /var/www;
+						    }
+						}
+
+					使用nginx -s reload重新加载配置文件。
+
+					如果请求为http://localhost/images/example.png，nginx将会返回/var/www/images/example.png文件，如果文件不存在就会返回404错误.http://localhost/some/example.html会返回/var/www/nginx/example.html文件
+			2.设置简单的代理服务器
+				server {
+				    listen 8080;
+				    root /var/www/nginx;
+
+				    location / {
+				    }
+				}
+
+
+				server {
+				    location / {
+				        proxy_pass http://localhost:8080;
+				    }
+
+				    location ~ \.(gif|jpg|png)$ {
+				    root /var/www/images;
+				}
+			3.设置fastCGI代理
+			
+				server {
+				    location / {
+				        fastcgi_pass  localhost:9000;
+				        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+				        fastcgi_param QUERY_STRING    $query_string;
+				    }
+
+				    location ~ \.(gif|jpg|png)$ {
+				        root /var/www/images;
+				    }
+				}
+			4.core module 支持一些内置的变量，与apache使用的变量相一致。
+				首先，一些变量代表了客户端请求头部的一些字段，如：$http_user_agent, $http_cookie等等。注意，由于这些变量会在请求中定义，所以可能无法保证他们是存在的或者说可以定义到一些别的地方（例如遵循一定的规范）。
+				除此之外，下列是一些其他变量：
+
+					* : $arg_PARAMETER
+					这个变量包含在查询字符串时GET请求PARAMETER的值。
+
+			     	* : $args
+					这个变量等于请求行中的参数。
+
+					* : $binary_remote_addr
+					二进制码形式的客户端地址。
+
+					* : $body_bytes_sent
+					未知。
+
+					* : $content_length
+					请求头中的Content-length字段。
+
+					* : $content_type
+					请求头中的Content-Type字段。
+
+					* : $cookie_COOKIE
+					cookie COOKIE的值。
+
+					* : $document_root
+					当前请求在root指令中指定的值。
+
+					* : $document_uri
+					与$uri相同。
+
+					* : $host
+					请求中的主机头字段，如果请求中的主机头不可用，则为服务器处理请求的服务器名称。
+
+					* : $is_args
+					如果$args设置，值为"?"，否则为""。
+
+					* : $limit_rate
+					这个变量可以限制连接速率。
+
+					* : $nginx_version
+					当前运行的nginx版本号。
+
+					* : $query_string
+					与$args相同。
+
+					* : $remote_addr
+					客户端的IP地址。
+
+					* : $remote_port
+					客户端的端口。
+
+					* : $remote_user
+					已经经过Auth Basic Module验证的用户名。
+
+					* : $request_filename
+					当前连接请求的文件路径，由root或alias指令与URI请求生成。
+
+					* : $request_body
+					这个变量（0.7.58+）包含请求的主要信息。在使用proxy_pass或fastcgi_pass指令的location中比较有意义。
+
+					* : $request_body_file
+					客户端请求主体信息的临时文件名。
+
+					* : $request_completion
+					未知。
+
+					* : $request_method
+					这个变量是客户端请求的动作，通常为GET或POST。
+					包括0.8.20及之前的版本中，这个变量总为main request中的动作，如果当前请求是一个子请求，并不使用这个当前请求的动作。
+
+					* : $request_uri
+					这个变量等于包含一些客户端请求参数的原始URI，它无法修改，请查看$uri更改或重写URI。
+
+					* : $scheme
+					HTTP方法（如http，https）。按需使用，例：
+					rewrite  ^(.+)$  $scheme://example.com$1  redirect;
+
+					* : $server_addr
+					服务器地址，在完成一次系统调用后可以确定这个值，如果要绕开系统调用，则必须在listen中指定地址并且使用bind参数。
+
+					* : $server_name
+					服务器名称。
+
+					* : $server_port
+					请求到达服务器的端口号。
+
+					* : $server_protocol
+					请求使用的协议，通常是HTTP/1.0或HTTP/1.1。
+
+					* : $uri
+					请求中的当前URI(不带请求参数，参数位于$args)，可以不同于浏览器传递的$request_uri的值，它可以通过内部重定向，或者使用index指令进行修改。
+
+		HTTP负载均衡模块（HTTP Upstream）
+			a.这个模块为后端的服务器提供简单的负载均衡（轮询（round-robin）和连接IP（client IP））
+				如下例：
+				upstream backend  {
+				  server backend1.example.com weight=5;
+				  server backend2.example.com:8080;
+				  server unix:/tmp/backend3;
+				}
+				 
+				server {
+				  location / {
+				    proxy_pass  http://backend;
+				  }
+				}
+			b.指令
+
+				* : ip_hash
+
+					语法：ip_hash 
+					默认值：none 
+					使用字段：upstream 
+					这个指令将基于客户端连接的IP地址来分发请求。
+					哈希的关键字是客户端的C类网络地址，这个功能将保证这个客户端请求总是被转发到一台服务器上，但是如果这台服务器不可用，那么请求将转发到另外的服务器上，这将保证某个客户端有很大概率总是连接到一台服务器。
+					无法将权重（weight）与ip_hash联合使用来分发连接。如果有某台服务器不可用，你必须标记其为“down”，如下例:
+					upstream backend {
+					  ip_hash;
+					  server   backend1.example.com;
+					  server   backend2.example.com;
+					  server   backend3.example.com  down;
+					  server   backend4.example.com;
+					}
+
+				* : server
+
+					语法：server name [parameters] 
+					默认值：none 
+					使用字段：upstream 
+					指定后端服务器的名称和一些参数，可以使用域名，IP，端口，或者unix socket。如果指定为域名，则首先将其解析为IP。
+					·weight = NUMBER - 设置服务器权重，默认为1。
+					·max_fails = NUMBER - 在一定时间内（这个时间在fail_timeout参数中设置）检查这个服务器是否可用时产生的最多失败请求数，默认为1，将其设置为0可以关闭检查，这些错误在proxy_next_upstream或fastcgi_next_upstream（404错误不会使max_fails增加）中定义。
+					·fail_timeout = TIME - 在这个时间内产生了max_fails所设置大小的失败尝试连接请求后这个服务器可能不可用，同样它指定了服务器不可用的时间（在下一次尝试连接请求发起之前），默认为10秒，fail_timeout与前端响应时间没有直接关系，不过可以使用proxy_connect_timeout和proxy_read_timeout来控制。
+					·down - 标记服务器处于离线状态，通常和ip_hash一起使用。
+					·backup - (0.6.7或更高)如果所有的非备份服务器都宕机或繁忙，则使用本服务器（无法和ip_hash指令搭配使用）。
+					示例配置
+					upstream  backend  {
+					  server   backend1.example.com    weight=5;
+					  server   127.0.0.1:8080          max_fails=3  fail_timeout=30s;
+					  server   unix:/tmp/backend3;
+					}
+					注意：如果你只使用一台上游服务器，nginx将设置一个内置变量为1，即max_fails和fail_timeout参数不会被处理。
+					结果：如果nginx不能连接到上游，请求将丢失。
+					解决：使用多台上游服务器。
+
+				* : upstream
+
+					语法：upstream name { ... } 
+					默认值：none 
+					使用字段：http 
+					这个字段设置一群服务器，可以将这个字段放在proxy_pass和fastcgi_pass指令中作为一个单独的实体，它们可以可以是监听不同端口的服务器，并且也可以是同时监听TCP和Unix socket的服务器。
+					服务器可以指定不同的权重，默认为1。
+					示例配置
+					upstream backend {
+					  server backend1.example.com weight=5;
+					  server 127.0.0.1:8080       max_fails=3  fail_timeout=30s;
+					  server unix:/tmp/backend3;
+					}
+					请求将按照轮询的方式分发到后端服务器，但同时也会考虑权重。
+					在上面的例子中如果每次发生7个请求，5个请求将被发送到backend1.example.com，其他两台将分别得到一个请求，如果有一台服务器不可用，那么请求将被转发到下一台服务器，直到所有的服务器检查都通过。如果所有的服务器都无法通过检查，那么将返回给客户端最后一台工作的服务器产生的结果。
+
+			c.变量
+
+				版本0.5.18以后，可以通过log_module中的变量来记录日志：
+				log_format timing '$remote_addr - $remote_user [$time_local]  $request '
+				  'upstream_response_time $upstream_response_time '
+				  'msec $msec request_time $request_time';
+				 
+				log_format up_head '$remote_addr - $remote_user [$time_local]  $request '
+				  'upstream_http_content_type $upstream_http_content_type';
+
+				$upstream_addr
+				前端服务器处理请求的服务器地址
+
+				$upstream_cache_status
+				0.8.3版本中其值可能为：
+				·MISS 
+				·EXPIRED - expired。请求被传送到后端。
+				·UPDATING - expired。由于proxy/fastcgi_cache_use_stale正在更新，将使用旧的应答。
+				·STALE - expired。由于proxy/fastcgi_cache_use_stale，后端将得到过期的应答。
+				·HIT
+
+				$upstream_status
+				前端服务器的响应状态。
+
+				$upstream_response_time
+				前端服务器的应答时间，精确到毫秒，不同的应答以逗号和冒号分开。
+
+				$upstream_http_$HEADER
+				随意的HTTP协议头，如：
+				$upstream_http_host
+		HTTP访问控制模块（HTTP Access）
+			a.摘要
+
+				这个模块提供简单的基于主机的访问控制。
+				ngx_http_access_module这个模块可以详细的检查客户端IP，并且按顺序执行第一条匹配的规则。
+				如下例：
+				location / {
+				  deny    192.168.1.1;
+				  allow   192.168.1.0/24;
+				  allow   10.1.1.0/16;
+				  deny    all;
+				}
+				上面的例子中仅允许192.168.1.0/24和10.1.1.0/16网络段访问，但192.168.1.1是个例外。
+				如果要实施很多复杂的规则，那么最好使用GeoIP module模块。
+
+			b.指令
+
+				* : allow
+				语法：allow [ address | CIDR | all ] 
+				默认值：no 
+				使用字段：http, server, location, limit_except 
+				指令指定了允许访问的IP或网络段。
+
+				* : deny
+				语法：deny [ address | CIDR | all ] 
+				默认值：no 
+				使用字段：http, server, location, limit_except 
+				指令指定了拒绝访问的IP或网络段。
+
+			c.提示和技巧
+
+				HttpAccess模块可以和error_page指令搭配使用来重定向一个未经验证的访问请求。
+				error_page  403  http://example.com/forbidden.html;
+				location / {
+				  deny    192.168.1.1;
+				  allow   192.168.1.0/24;
+				  allow   10.1.1.0/16;
+				  deny    all;
+				}
+
+
+		HTTP目录清单生成模块（HTTP Auto Index）
+			a.摘要
+
+				这个模块提供自动目录列表。
+				连接请求仅在ngx_http_index_module中没有找到主页文件时才会请求这个模块。
+				如果没有找到index指令指定的文件则会列出指定目录下的目录文件。
+				如下例：
+				location  /  {
+				  autoindex  on;
+				}
+
+			b.指令
+
+				* ： autoindex
+					语法：autoindex [ on|off ] 
+					默认值：autoindex off 
+					使用字段：http, server, location 
+					是否使用自动目录列表。
+
+				* ： autoindex_exact_size
+					语法：autoindex_exact_size [ on|off ] 
+					默认值：autoindex_exact_size on 
+					使用字段：http, server, location 
+					指定生成的自动目录文件大小，可以是精确到bytes或者使用KB, MB或GB。
+
+				* ： autoindex_localtime
+					语法：autoindex_localtime [ on|off ] 
+					默认值：autoindex_localtime off 
+					使用字段：http, server, location 
+					是否在目录列表文件中显示本地时间（GMT时间），默认为关。
+		浏览器相关模块（Browser）
+				a.摘要
+
+					这个模块按照请求头中的“User-agent”来创建一些变量：
+						·$modern_browser - 如果浏览器被识别为一个当前流行的浏览器，这个值等于指令modern_browser_value指定的值。
+						·$ancient_browser - 如果浏览器被识别为一个比较旧的浏览器，这个值等于指令ancient_browser_value指定的值。
+						·$msie - 如果浏览器被识别为MSIE，这个值为1。
+					如果不需要这个模块，可以在编译nginx时增加--without-http_browser_module参数。
+				b.配置实例：
+					为指定的浏览器指定主页文件：
+					modern_browser_value "modern.";
+					modern_browser msie 5.5;
+					modern_browser gecko 1.0.0;
+					modern_browser opera 9.0;
+					modern_browser safari 413;
+					modern_browser konqueror 3.0;
+					index index.${modern_browser}html index.html;
+					
+					将一些来自比较旧的浏览器重定向：
+				
+					modern_browser msie 5.0;
+					modern_browser gecko 0.9.1;
+					modern_browser opera 8.0;
+					modern_browser safari 413;
+					modern_browser konqueror 3.0;
+					modern_browser unlisted;
+					ancient_browser Links Lynx Netscape4;
+					 
+					if ($ancient_browser){
+					  rewrite  ^  /ancient.html;
+					}
+
+				b.指令
+
+					* : ancient_browser
+						语法：ancient_browser line [ line... ] 
+						默认值：no 
+						使用字段：http, server, location 
+						在"User-agent"字段中的浏览器被识别为旧浏览器时，这个指令指定一些子链。
+						一个比较特殊的字段是"netscape4"，它对应正则表达式"^Mozilla/[1-4] "。
+
+					* : ancient_browser_value
+						语法：ancient_browser_value line 
+						默认值：ancient_browser_value 1 
+						使用字段：http, server, location 
+						指定变量$ancient_browser的值。
+
+					* : modern_browser
+						语法：modern_browser browser version|unlisted 
+						默认值：no 
+						使用字段：http, server, location 
+						指令将指定哪个版本的浏览器将被认为是目前流行的。
+						可以指定的浏览器为：msie, gecko (基于Mozilla的浏览器) opera, safari, konqueror。
+						可以使用的版本格式为X, X.X, X.X.X, 或X.X.X.X，每个的最大值为4000, 4000.99, 4000.99.99,和4000.99.99.99。
+						一个特殊的值"unlisted"在被认为是流行的浏览器中指定，而不是通过modern_browser或ancient_browser指令。
+						如果请求头中没有"User-agent"字段，那么这个浏览器被认为是古老的（除非指定“modern_browser unlisted”）。
+
+					* : modern_browser_value
+						语法：modern_browser_value line 
+						默认值：modern_browser_value 1 
+						使用字段：http, server, location 
+						指定$modern_browser变量的值。
+		字符集设置模块（Charset）
+				a.摘要
+					这个模块将在应答头中为"Content-Type"字段添加字符编码。
+					此外，这个模块可以将数据重新编码，只能在单向对其进行重新编码，即来自服务器到达客户端。
+					配置实例：
+					charset         windows-1251;
+					source_charset  koi8-r;
+				b.指令
+					* : charset
+						语法：charset encoding|off 
+						默认值：charset off 
+						使用字段：http, server, location, location中的if字段 
+						这个指令使应答头中的"Content-Type"字段使用指定的编码集，如果这个字符集与source_charset指令设置的字符集不相同，将重新编码字符集，参数off表明不在应答头中添加"Content-Type"信息。
+
+					* : charset_map
+						语法：charset_map encoding1 encoding2 {...} 
+						默认值：no 
+						使用字段：http, server, location 
+						charset_map指定了一个编码转换表，同时会创建一个反向转换表，代码均使用十六进制，如果在80-FF范围内没有被记录的代码，它们将被标记为"？"。
+						如下例：
+						charset_map  koi8-r  windows-1251 {
+						  C0  FE ; # small yu
+						  C1  E0 ; # small a
+						  C2  E1 ; # small b
+						  C3  F6 ; # small ts
+						  # ...
+						}
+						将koi8-r转换为Windows-1251的完整转换表为conf/koi-win。
+
+					* : override_charset
+						语法：override_charset on|off 
+						默认值：override_charset off 
+						使用字段：http, server, location, if中的location字段 
+						参数指定在代理服务器或者FastCGI服务器上取得的应答头中存在"Content-Type"字段，将为应答启用编码转换，如果允许编码转换，将使用应答头中指定的编码对其初始化。
+						注意如果是在一个子查询中取得的应答，会始终将应答中的编码转换为基础编码，并不依赖于override_charset指令。
+
+					* : source_charset
+						语法：source_charset encoding 
+						默认值：no 
+						使用字段：http, server, location, if中的location字段 
+						参数指定了应答中的初始代码，如果这个参数与charset指令中的不同，将启用编码转换。
+
+		Empty GIF模块（Empty GIF）
+			a.摘要
+				这个模块在内存中保存一个能够很快传递的1×1透明GIF。
+				简单用法：
+				location = /_.gif {
+				  empty_gif;
+				}
+			b.指令
+				* : empty_gif
+					语法：empty_gif 
+					默认值：n/a 
+					使用字段：location 
+		FastCGI模块（FastCGI）
+			a.摘要
+
+				这个模块允许nginx同FastCGI协同工作，并且控制哪些参数将被安全传递。
+				例：
+				location / {
+					include fastcgi_params;
+				  	fastcgi_pass   localhost:9000;
+				  	#fastcgi_pass unix:/run/php/php7.0-fpm.sock;
+				  	fastcgi_index  index.php;
+				 
+				  	fastcgi_param  SCRIPT_FILENAME  /home/www/scripts/php$fastcgi_script_name;
+				  	fastcgi_param  QUERY_STRING     $query_string;
+				}
+				一个在缓存中的实例：
+				http {
+				  fastcgi_cache_path   /path/to/cache  levels=1:2
+				                       keys_zone=NAME:10m
+				                       inactive=5m;
+				 
+				  server {
+				    location / {
+				      fastcgi_pass    http://127.0.0.1;
+				      fastcgi_cache   NAME;
+				      fastcgi_cache_valid   200 302  1h;
+				      fastcgi_cache_valid   301      1d;
+				      fastcgi_cache_valid   any      1m;
+				      fastcgi_cache_min_uses  1;
+				      fastcgi_cache_use_stale error  timeout invalid_header http_500;
+				    }
+				  }
+				}
+				0.7.48以后，缓存遵循后端服务器的Cache-Control, Expires等，0.7.66版本以后，"Cache-Control:"private"和"no-store"头同样被遵循。
+
+			b.指令
+
+				* : fastcgi_buffer_size
+					语法：fastcgi_buffer_size the_size ;
+					默认值：fastcgi_buffer_size 4k/8k ;
+					使用字段：http, server, location 
+					这个参数指定将用多大的缓冲区来读取从FastCGI服务器到来应答的第一部分。
+					通常来说在这个部分中包含一个小的应答头。
+					默认的缓冲区大小为fastcgi_buffers指令中的每块大小，可以将这个值设置更小。
+
+				* : fastcgi_buffers
+					语法：fastcgi_buffers the_number is_size; 
+					默认值：fastcgi_buffers 8 4k/8k; 
+					使用字段：http, server, location 
+					这个参数指定了从FastCGI服务器到来的应答，本地将用多少和多大的缓冲区读取，默认这个参数等于分页大小，根据环境的不同可能是4K, 8K或16K。
+
+				* : fastcgi_cache
+					语法：fastcgi_cache zone|off; 
+					默认值：off 
+					使用字段：http, server, location 
+					为缓存实际使用的共享内存指定一个区域，相同的区域可以用在不同的地方。
+
+				* : fastcgi_cache_key
+					语法：fastcgi_cache_key line
+					默认值：none 
+					使用字段：http, server, location 
+					设置缓存的关键字，如：
+					fastcgi_cache_key localhost:9000$request_uri;
+
+				* : fastcgi_cache_path
+					语法：fastcgi_cache_path path [levels=m:n] keys_zone=name:size [inactive=time] [max_size=size] 
+					默认值：none 
+					使用字段：http 
+					clean_time参数在0.7.45版本中已经移除。
+					这个指令指定FastCGI缓存的路径以及其他的一些参数，所有的数据以文件的形式存储，缓存的关键字(key)和文件名为代理的url计算出的MD5值。
+					Level参数设置缓存目录的目录分级以及子目录的数量，例如指令如果设置为：
+					fastcgi_cache_path  /data/nginx/cache  levels=1:2   keys_zone=one:10m;
+					那么数据文件将存储为：
+					/data/nginx/cache/c/29/b7f54b2df7773722d382f4809d65029c
+					缓存中的文件首先被写入一个临时文件并且随后被移动到缓存目录的最后位置，0.8.9版本之后可以将临时文件和缓存文件存储在不同的文件系统，但是需要明白这种移动并不是简单的原子重命名系统调用，而是整个文件的拷贝，所以最好在fastcgi_temp_path和fastcgi_cache_path的值中使用相同的文件系统。
+					另外，所有活动的关键字及数据相关信息都存储于共享内存池，这个值的名称和大小通过key_zone参数指定，inactive参数指定了内存中的数据存储时间，默认为10分钟。
+					max_size参数设置缓存的最大值，一个指定的cache manager进程将周期性的删除旧的缓存数据。
+
+				* : fastcgi_cache_methods
+					语法：fastcgi_cache_methods [GET HEAD POST]; 
+					默认值：fastcgi_cache_methods GET HEAD; 
+					使用字段：main,http,location 
+					无法禁用GET/HEAD ，即使你只是这样设置：
+					fastcgi_cache_methods  POST;
+
+				* : fastcgi_cache_min_uses
+					语法：fastcgi_cache_min_uses n 
+					默认值：fastcgi_cache_min_uses 1 
+					使用字段：http, server, location 
+					指令指定了经过多少次请求的相同URL将被缓存。
+
+				* : fastcgi_cache_path
+					语法：fastcgi_cache_path /path/to/cache [levels=m:n keys_zone=name:time inactive=time] 
+					默认值：none 
+					使用字段：http
+					clean_time参数在0.7.45版本被移除
+					未知。
+
+				* : fastcgi_cache_use_stale
+					语法：fastcgi_cache_use_stale [updating|error|timeout|invalid_header|http_500] 
+					默认值：fastcgi_cache_use_stale off; 
+					使用字段：http, server, location 
+					未知。
+
+				* : fastcgi_cache_valid
+					语法：fastcgi_cache_valid [http_error_code|time] 
+					默认值：none 
+					使用字段：http, server, location 
+					为指定的http返回代码指定缓存时间，例如：
+					fastcgi_cache_valid  200 302  10m;
+					fastcgi_cache_valid  404      1m;
+					将响应状态码为200和302缓存10分钟，404缓存1分钟。
+					默认情况下缓存只处理200，301，302的状态。
+					同样也可以在指令中使用any表示任何一个。
+					fastcgi_cache_valid  200 302 10m;
+					fastcgi_cache_valid  301 1h;
+					fastcgi_cache_valid  any 1m;
+
+				* : fastcgi_connect_timeout
+					语法：fastcgi_connect_timeout time 
+					默认值：fastcgi_connect_timeout 60 
+					使用字段：http, server, location 
+					指定同FastCGI服务器的连接超时时间，这个值不能超过75秒。
+
+				* : fastcgi_index
+					语法：fastcgi_index file 
+					默认值：none 
+					使用字段：http, server, location 
+					如果URI以斜线结尾，文件名将追加到URI后面，这个值将存储在变量$fastcgi_script_name中。例如：
+					fastcgi_index  index.php;
+					fastcgi_param  SCRIPT_FILENAME  /home/www/scripts/php$fastcgi_script_name;
+					请求"/page.php"的参数SCRIPT_FILENAME将被设置为"/home/www/scripts/php/page.php"，但是"/"为"/home/www/scripts/php/index.php"。
+
+				* : fastcgi_hide_header
+					语法：fastcgi_hide_header name 
+					使用字段：http, server, location 
+					默认情况下nginx不会将来自FastCGI服务器的"Status"和"X-Accel-..."头传送到客户端，这个参数也可以隐藏某些其它的头。
+					如果必须传递"Status"和"X-Accel-..."头，则必须使用fastcgi_pass_header强制其传送到客户端。
+
+				* : fastcgi_ignore_client_abort
+					语法：fastcgi_ignore_client_abort on|off 
+					默认值：fastcgi_ignore_client_abort off 
+					使用字段：http, server, location 
+					如果当前连接请求FastCGI服务器失败，为防止其与nginx服务器断开连接，可以用这个指令。
+
+				* : fastcgi_ignore_headers
+					语法：fastcgi_ignore_headers name [name...] 
+					使用字段：http, server, location 
+					这个指令禁止处理一些FastCGI服务器应答的头部字段，比如可以指定像"X-Accel-Redirect", "X-Accel-Expires", "Expires"或"Cache-Control"等。
+
+				* : fastcgi_intercept_errors
+					语法：fastcgi_intercept_errors on|off 
+					默认值：fastcgi_intercept_errors off 
+					使用字段：http, server, location 
+					这个指令指定是否传递4xx和5xx错误信息到客户端，或者允许nginx使用error_page处理错误信息。
+					你必须明确的在error_page中指定处理方法使这个参数有效，正如Igor所说“如果没有适当的处理方法，nginx不会拦截一个错误，这个错误不会显示自己的默认页面，这里允许通过某些方法拦截错误。
+
+				* : fastcgi_max_temp_file_size
+					语法：fastcgi_max_temp_file_size 0 
+					默认值：? 
+					使用字段：? 
+					根据源代码关闭FastCGI缓冲。
+
+				* : fastcgi_no_cache
+					语法：fastcgi_no_cache variable [...]
+					默认值：None 
+					使用字段：http, server, location 
+					确定在何种情况下缓存的应答将不会使用，示例：
+					  fastcgi_no_cache $cookie_nocache  $arg_nocache$arg_comment;
+					  fastcgi_no_cache $http_pragma     $http_authorization;
+					如果为空字符串或者等于0，表达式的值等于false，例如，在上述例子中，如果在请求中设置了cookie "nocache"，缓存将被绕过。
+
+				* : fastcgi_next_upstream
+					语法：fastcgi_next_upstream error|timeout|invalid_header|http_500|http_503|http_404|off 
+					默认值：fastcgi_next_upstream error timeout 
+					使用字段：http, server, location 
+					指令指定哪种情况请求将被转发到下一个FastCGI服务器：
+					·error — 传送中的请求或者正在读取应答头的请求在连接服务器的时候发生错误。
+					·timeout — 传送中的请求或者正在读取应答头的请求在连接服务器的时候超时。
+					·invalid_header — 服务器返回空的或者无效的应答。
+					·http_500 — 服务器返回500应答代码。
+					·http_503 — 服务器返回503应答代码。
+					·http_404 — 服务器返回404应答代码。
+					·off — 禁止请求传送到下一个FastCGI服务器。
+					注意传送请求在传送到下一个服务器之前可能已经将空的数据传送到了客户端，所以，如果在数据传送中有错误或者超时发生，这个指令可能无法修复一些传送错误。
+
+				* : fastcgi_param
+					语法：fastcgi_param parameter value 
+					默认值：none 
+					使用字段：http, server, location 
+					指定一些传递到FastCGI服务器的参数。
+					可以使用字符串，变量，或者其组合，这里的设置不会继承到其他的字段，设置在当前字段会清除掉任何之前的定义。
+					下面是一个PHP需要使用的最少参数：
+					  fastcgi_param  SCRIPT_FILENAME  /home/www/scripts/php$fastcgi_script_name;
+					  fastcgi_param  QUERY_STRING     $query_string;
+					PHP使用SCRIPT_FILENAME参数决定需要执行哪个脚本，QUERY_STRING包含请求中的某些参数。
+					如果要处理POST请求，则需要另外增加三个参数：
+					  fastcgi_param  REQUEST_METHOD   $request_method;
+					  fastcgi_param  CONTENT_TYPE     $content_type;
+					  fastcgi_param  CONTENT_LENGTH   $content_length;
+					如果PHP在编译时带有--enable-force-cgi-redirect，则必须传递值为200的REDIRECT_STATUS参数：
+					fastcgi_param  REDIRECT_STATUS  200;
+
+				* : fastcgi_pass
+					语法：fastcgi_pass fastcgi-server 
+					默认值：none 
+					使用字段：http, server, location 
+					指定FastCGI服务器监听端口与地址，可以是本机或者其它：
+					fastcgi_pass   localhost:9000;
+					使用Unix socket:
+					fastcgi_pass   unix:/tmp/fastcgi.socket;
+					同样可以使用一个upstream字段名称：
+					upstream backend  {
+					  server   localhost:1234;
+					}
+					fastcgi_pass   backend;
+
+					fastcgi_pass_header
+
+					语法：fastcgi_pass_header name 
+					默认值：none 
+					使用字段：http, server, location 
+
+				* : fastcgi_read_timeout
+					语法：fastcgi_read_timeout time 
+					默认值：fastcgi_read_timeout 60 
+					使用字段：http, server, location 
+					前端FastCGI服务器的响应超时时间，如果有一些直到它们运行完才有输出的长时间运行的FastCGI进程，或者在错误日志中出现前端服务器响应超时错误，可能需要调整这个值。
+
+				* : fastcgi_redirect_errors
+					语法：fastcgi_redirect_errors on|off 
+					指令重命名为fastcgi_intercept_errors。
+
+				* : fastcgi_send_timeout
+					语法：fastcgi_send_timeout time 
+					默认值：fastcgi_send_timeout 60 
+					使用字段：http, server, location 
+					指令为上游服务器设置等待一个FastCGI进程的传送数据时间，如果有一些直到它们运行完才有输出的长时间运行的FastCGI进程，那么可以修改这个值，如果你在上有服务器的error log里面发现一些超时错误，那么可以恰当的增加这个值。
+					指令指定请求服务器的超时时间，指完成了2次握手的连接，而不是完整的连接，如果在这期间客户端没有进行数据传递，那么服务器将关闭这个连接。
+
+				* : fastcgi_split_path_info
+					语法：fastcgi_split_path_info regex 
+					使用字段：location 
+					可用版本：0.7.31以上，示例：
+					location ~ ^(.+\.php)(.*)$ {
+					...
+					fastcgi_split_path_info ^(.+\.php)(.*)$;
+					fastcgi_param SCRIPT_FILENAME /path/to/php$fastcgi_script_name;
+					fastcgi_param PATH_INFO $fastcgi_path_info;
+					fastcgi_param PATH_TRANSLATED $document_root$fastcgi_path_info;
+					...
+					}
+					请求"/show.php/article/0001"的参数SCRIPT_FILENAME将设置为"/path/to/php/show.php"，参数PATH_INFO为"/article/0001"。
+
+				* : fastcgi_store
+					语法：fastcgi_store [on | off | path] 
+					默认值：fastcgi_store off 
+					使用字段：http, server, location 
+					制定了存储前端文件的路径，参数on指定了将使用root和alias指令相同的路径，off禁止存储，此外，参数中可以使用变量使路径名更明确：
+					fastcgi_store   /data/www$original_uri;
+					应答中的"Last-Modified"头将设置文件的最后修改时间，为了使这些文件更加安全，可以将其在一个目录中存为临时文件，使用fastcgi_temp_path指令。
+					这个指令可以用在为那些不是经常改变的后端动态输出创建本地拷贝的过程中。如：
+					location /images/ {
+					  root                 /data/www;
+					  error_page           404 = /fetch$uri;
+					}
+					 
+					location /fetch {
+					  internal;
+					 
+					  fastcgi_pass           fastcgi://backend;
+					  fastcgi_store          on;
+					  fastcgi_store_access   user:rw  group:rw  all:r;
+					  fastcgi_temp_path      /data/temp;
+					 
+					  alias                  /data/www;
+					}
+					fastcgi_store并不是缓存，某些需求下它更像是一个镜像。
+
+				* : fastcgi_store_access
+					语法：fastcgi_store_access users:permissions [users:permission ...] 
+					默认值：fastcgi_store_access user:rw 
+					使用字段：http, server, location 
+					这个参数指定创建文件或目录的权限，例如：
+					fastcgi_store_access  user:rw  group:rw  all:r;
+					如果要指定一个组的人的相关权限，可以不写用户，如：
+					fastcgi_store_access  group:rw  all:r;
+
+				* : fastcgi_temp_path
+					语法：fastcgi_temp_path path [level1 [level2 [level3]]] 
+					默认值：fastcgi_temp_path fastcgi_temp 
+					使用字段：http, server, location 
+					指令指定存储从别的服务器传送来的数据临时文件路径，同样可以指定三级目录已经哈希存储，level的值指定为哈希设置多少标记，例如，在下列配置中：
+					fastcgi_temp_path  /spool/nginx/fastcgi_temp 1 2;
+					临时文件类似如下：
+					/spool/nginx/fastcgi_temp/7/45/00000123457
+
+					·传送到FastCGI服务器的相关参数
+
+					请求头是以参数的形式传送到FastCGI服务器，以具体应用和脚本运行在FastCGI服务器上，这些参数通常以环境变量的形式取得，例如，"User-agent"头以HTTP_USER_AGENT参数传递，除此之外还有一些其他的http头，都可以用fastcgi_param指令自由传递。
+
+			c.变量
+
+				* : $fastcgi_script_name
+
+				这个变量等于一个以斜线结尾的请求URI加上fastcgi_index给定的参数。可以用这个变量代替SCRIPT_FILENAME 和PATH_TRANSLATED，以确定php脚本的名称。
+				如下例，请求"/info/": 
+				 fastcgi_index  index.php;
+				  fastcgi_param  SCRIPT_FILENAME  /home/www/scripts/php$fastcgi_script_name;
+				SCRIPT_FILENAME等于"/home/www/scripts/php/info/index.php"。
+
+		Geo模块（Geo）
+			a.摘要
+				这个模块创建一些变量，其值依赖于客户端的IP地址：
+				如下例：
+				geo  $geo  {
+				  default          0;
+				  127.0.0.1/32     2;
+				  192.168.1.0/24   1;
+				  10.1.0.0/16      1;
+				}
+
+			b.指令
+				* : geo
+					语法：geo [$ip_variable] $variable { ... } 
+					默认值：none 
+					使用字段：http 
+					这个指令指定了一个客户端IP的所属国家，默认情况下它会查找$remote_addr变量，但在0.7.27版本以后可以手工指定。
+					 geo  $arg_remote_addr $geo {
+					   ...;
+					 }
+					使用CIDR地址格式，另外，有4个特殊的参数：
+					·delete - 删除指定的网络（0.7.23）
+					·default - 将一些没有定义的地址替换为0.0.0.0/0。
+					·include - 具有地址信息的文本文件，可以包含多个。
+					·proxy - 指定代理服务器地址（0.8.7）。
+					·ranges - 指定使用以地址池的形式定义地址(0.7.23)，这个参数必须放在首位。
+					 geo  $country  {
+					   default          no;
+					   include          conf/geo.conf;
+					   127.0.0.0/24     us;
+					   127.0.0.1/32     ru;
+					   10.1.0.0/16      ru;
+					   192.168.1.0/24   uk;
+					 }
+					conf/geo.conf文件内容：
+					 10.2.0.0/16      ru;
+					 192.168.2.0/24   ru;
+					该值将使用最大的参数，例如127.0.0.1将为“ru”,而不是“us”。
+					一个使用ranges的例子：
+					 geo  $country  {
+					   ranges;
+					   default                    no; 
+					   127.0.0.0-127.0.0.0        us;
+					   127.0.0.1-127.0.0.1        ru;
+					   127.0.0.1-127.0.0.255      us;
+					   10.1.0.0-10.1.255.255      ru;
+					   192.168.1.0-192.168.1.255  uk; 
+					 }
+			c.geo模块与利用其配置负载均衡的示例
+				  geo $geo {
+				    default default;
+				    192.168.6.189/32    uk;
+				    192.168.6.8/32     us;
+				  #这里的子网码是 32 是因为，我是单网段测试，如果你有VLAN，你可以是24 例如
+				  # 192.168.0.0/24   tw
+				  }
+				  upstream  uk.server {
+				    server 192.168.6.101;
+				  }
+				  upstream  us.server {
+				    server 192.168.6.102;
+				  }
+				  upstream  default.server {
+				    server 192.168.6.121:8080;
+				  }
+				  sendfile    on;
+				  keepalive_timeout 65;
+				 
+				  server {
+				    listen    80;
+				    server_name 192.168.6.121;
+				    index index.html index.htm;
+				    root html;
+				 
+				    location / {
+				        proxy_redirect off;
+				        proxy_set_header Host $host;
+				        proxy_set_header X-Real-IP $remote_addr;
+				        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+				        proxy_pass http://$geo.server$request_uri;
+				    }
+				    error_page  500 502 503 504 /50x.html;
+				    location = /50x.html {
+				      root  html;
+				    }
+				  
+				  }
+				  
+				  server {
+				    listen    8080;
+				    server_name 192.168.6.121;
+				    location / {
+				      root  html;
+				      index index.html index.htm;
+				    }
+				  }
+
+				  server {
+				    listen    80;
+				    server_name 192.168.6.102;
+				    location / {
+				      root  html;
+				      index index.html index.htm;
+				    }
+				  }
+
+				  server {
+				    listen    80;
+				    server_name 192.168.6.102;
+				    location / {
+				      root  html;
+				      index index.html index.htm;
+				    }
+				  }
+		Gzip模块（Gzip）
+			a.摘要
+				这个模块允许在文件传输过程中使用gzip压缩。
+				如下例：
+				  gzip             on;
+				  gzip_min_length  1000;
+				  gzip_proxied     expired no-cache no-store private auth;
+				  gzip_types       text/plain application/xml;
+				  gzip_disable     "MSIE [1-6]\.";
+				可以使用$gzip_ratio变量指定压缩比率。
+
+			b.指令
+
+				* : gzip
+					语法：gzip on|off 
+					默认值：gzip off 
+					使用字段：http, server, location, location中的if字段
+					指定是否启用gzip压缩。
+
+				* : gzip_buffers
+					语法：gzip_buffers number size 
+					默认值：gzip_buffers 4 4k/8k 
+					使用字段：http, server, location 
+					指定缓存压缩应答的缓冲区数量和大小，如果不设置，一个缓存区的大小为分页大小，根据环境的不同可能是4k或8k。
+
+				* : gzip_comp_level
+					语法：gzip_comp_level 1..9 
+					默认值：gzip_comp_level 1 
+					使用字段：http, server, location 
+					指定压缩等级，其值从1到9，1为最小化压缩（处理速度快），9为最大化压缩（处理速度慢）。
+
+				* : gzip_disable
+					语法：gzip_disable regex 
+					使用字段：http, server, location 
+					使用正则表达式来指定某些不需要gzip压缩的浏览器（将和User-Agents进行匹配）。依赖于PCRE库。在0.6.23版本中首次使用。
+					0.7.63版本以后，你可以为IE5.5和IE6 SP1使用msie6参数来禁止gzip压缩。
+					gzip_disable     "msie6";
+
+				* : gzip_http_version
+					语法：gzip_http_version 1.0|1.1 
+					默认值：gzip_http_version 1.1 
+					使用字段：http, server, location 
+					是否根据HTTP请求版本来启用gzip压缩。
+					当HTTP版本为1.0时，Vary: Accept-Encoding没有被设置，这将引起某些代理缓存失效，可以使用add_header，同样，在使用这个版本时Content-Length也没有设置，因此Keepalive不能在这个版本使用。
+
+				* : gzip_min_length
+					语法：gzip_min_length length 
+					默认值：gzip_min_length 0 
+					使用字段：http, server, location 
+					设置被压缩的最小请求，单位为bytes。少于这个值大小的请求将不会被压缩，这个值由请求头中的Content-Length字段决定。
+
+				* : gzip_proxied
+					语法：gzip_proxied [off|expired|no-cache|no-store|private|no_last_modified|no_etag|auth|any] ... 
+					默认值：gzip_proxied off 
+					使用字段：http, server, location 
+					根据某些请求和应答来决定是否在对代理请求的应答启用压缩，事实上，代理请求取决于请求头中的“Via”字段，指令中可以同时指定多个不同的参数：
+					·off - 为所有代理请求禁用压缩。
+					·expired - 当“Expires”头禁用缓存时启用压缩。
+					·no-cache - 当“Cache-Control”头设置为no-cache时启用压缩。
+					·no-store - 当“Cache-Control”头设置为no-store时启用压缩。
+					·private - 当“Cache-Control”头设置为private时启用压缩。
+					·no_last_modified - 当“Last-Modified”没有定义时启用压缩。
+					·no_etag - 没有“ETag”头时启用压缩。
+					·auth - 当有一个“Authorization”头时启用压缩。
+					·any - 为所有请求启用压缩。
+
+				* : gzip_types
+					gzip_types mime-type [mime-type ...] 
+					默认值：gzip_types text/html 
+					使用字段：http, server, location 
+					为除“text/html”之外的MIME类型启用压缩，“text/html”总是会被压缩。
+
+				* : gzip_vary
+					ggzip_vary on|off 
+					默认值：gzip_vary off 
+					使用字段：http, server, location 
+					启用应答头“Vary: Accept-Encoding”，注意，由于一个bug将导致IE 4-6无法缓存内容。
+		HTTP头处理模块（HTTP Headers）
+			a.摘要
+				这个模块允许设置任意的HTTP头。
+				如下例：
+				  expires       24h;
+				  expires       modified +24h;
+				  expires       @15h30m;
+				  expires       0;
+				  expires       -1;
+				  expires       epoch;
+				  add_header    Cache-Control  private;
+
+			b.指令
+
+				* : add_header
+					语法：add_header name value 
+					默认值：none 
+					使用字段：http, server, location 
+					当服务器应答代码为200, 204, 301, 302或304时为HTTP应答添加头。
+					这个值可以使用变量
+					注意这个指令只会在输出的头部中增加某个新字段，而并不能对某些已经定义的头（如server）进行重写，如果要实现这个操作可以使用第三方模块headers_more。
+
+					location ~ / {
+		                expires       24h;
+		                add_header    Cache-Control  private;
+		                gzip on;
+		            }
+
+
+				* : expires
+					语法：expires [time|@time-of-day|epoch|max|off] 
+					默认值：expires off 
+					使用字段：http, server, location 
+					这个指令控制是否在应答中标记一个过期时间，如果是，如何标记。
+					·off 将禁止修改头部中的 Expires和Cache-Control字段。
+					·epoch 将Expires头设置为1 January, 1970 00:00:01 GMT。
+					·max 将Expires头设置为31 December 2037 23:59:59 GMT，将Cache-Control最大化到10 years。
+					·如果将指令设置为一个不带@标记的值，那么过期时间将是应答时间的相对时间（如果这个时间在“modified”之前），或者是文件的修改时间（当"modified"存在，在版本0.7.0和0.6.32可用），并且可以指定一个负的时间，它将Cache-Control头设置为no-cache比较。
+					·如果指令的值被设置为一个带@标记的值，那么将指定一个绝对的time-of-day过期时间，可以指定两种格式分别为Hh或Hh:Mm，其中H的大小范围为0到24，M的大小范围为0到59（在0.7.9和0.6.34可用）。
+					一个非负的时间值将Cache-Control头设置为 max-age = #，#将适当的换算为秒数。
+					注意：expires仅仅适用于200, 204, 301, 302,和304应答
+
+三、使用陷阱
+	1.error_page 
+	error_page 404 = /var/www/nginx/index.html;有等号的时候返回是200;
+	error_page 404  /var/www/nginx/index.html;没有等号的时候返回是404
+
+四、变量
+
+	
