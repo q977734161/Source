@@ -8,14 +8,7 @@
 			* ： reopen 重新打开日志
 	2.可以使用kill向nginx发送信号
 		kill -s QUIT [pid(nginx进程号)]
-    TERM, INT	快速关闭
-    QUIT	从容关闭
-    HUP	重载配置
-      用新的配置开始新的工作进程
-    从容关闭旧的工作进程
-    USR1	重新打开日志文件
-    USR2	平滑升级可执行程序。
-    WINCH	从容关闭工作进程
+
 二、配置文件结构
 		HTTP核心模块（HTTP Core）
 			Nginx是一系列在配置文件中控制指令的模块组成。这些指令分为简单指令和块指令。
@@ -1018,12 +1011,1113 @@
 					·如果指令的值被设置为一个带@标记的值，那么将指定一个绝对的time-of-day过期时间，可以指定两种格式分别为Hh或Hh:Mm，其中H的大小范围为0到24，M的大小范围为0到59（在0.7.9和0.6.34可用）。
 					一个非负的时间值将Cache-Control头设置为 max-age = #，#将适当的换算为秒数。
 					注意：expires仅仅适用于200, 204, 301, 302,和304应答
+		默认主页设置模块（Index）
+			a.摘要
+
+				如果URL中没有指定文件，则设置一个默认主页。
+				如下例：
+				  index index.html;
+				可以指定多个文件，如果第一个文件没有找到，将会查找后面指定的文件：
+				  index index.html index.htm;
+
+			b.指令
+
+				* : index
+					语法：index file-path [file-path [ ... ] ]; 
+					默认值：no 
+					使用字段：server, location 
+		HTTP Referer模块（HTTP Referer）
+			a.摘要
+				当一个请求头的Referer字段中包含一些非正确的字段，这个模块可以禁止这个请求访问站点。
+				这个头可以随意的伪造，因此，使用这个模块并不能100%的阻止这些请求，绝大多数拒绝的请求来自一些典型的浏览器，可以认为这些典型的浏览器并不能提供一个"Referer"头，甚至是那些正确的请求。
+				如下例：
+				 location /photos/ {
+				  valid_referers none blocked www.mydomain.com mydomain.com;
+				 
+				  if ($invalid_referer) {
+				    return   403;
+				  }
+				}
+
+			b.指令
+
+				* : valid_referers
+					语法：valid_referers [none|blocked|server_names] ... 
+					默认值：none 
+					使用字段：server, location 
+					这个指令在referer头的基础上为 $invalid_referer 变量赋值，其值为0或1。
+					可以使用这个指令来实现防盗链功能，如果valid_referers列表中没有Referer头的值， $invalid_referer将被设置为1（参照前例）。
+					参数可以使如下形式：
+					·none意为不存在的Referer头
+					·blocked意为根据防火墙伪装Referer头，如：“Referer: XXXXXXX”。
+					·server_names为一个或多个服务器的列表，0.5.33版本以后可以在名称中使用“*”通配符。
+
+		HTTP Limit Zone模块（HTTP Limit Zone）
+			a.摘要
+				这个模块可以为一个地址指定的会话或者某些特殊情况限制同时连接数，
+				如下例：
+				 http {
+				  limit_zone   one  $binary_remote_addr  10m;
+				 
+				  server {
+				    location /download/ {
+				      limit_conn   one  1;
+				    }
+				  }
+				}
+
+			b.指令
+
+				* : limit_zone
+					语法：limit_zone zone_name $variable memory_max_size 
+					默认值：no 
+					使用字段：http 
+					指令描述会话状态存储区域。
+					会话的数目按照指定的变量来决定，它依赖于使用的变量大小和memory_max_size的值。
+					如下例：
+					limit_zone one $binary_remote_addr 10m;
+					客户端的地址将用于会话，注意$binary_remote_addr变量将替换$remote_addr而被使用。
+					$remote_addr 变量的值的长度可以是7到15字节，因此大小指定为32或64字节。 
+					$binary_remote_addr 变量的值的长度总是4字节，大小总是32字节。
+					当会话状态储存区域为1M时理论上可以处理32000个会话，每个会话大小为32字节。
+
+				* : limit_conn
+					语法：limit_conn zone_name max_clients_per_ip 
+					默认值：no 
+					使用字段：http, server, location 
+					指令指定一个会话的最大同时连接数，超过这个数字的请求将被返回"Service unavailable" (503)代码。
+					如下例：
+					limit_zone   one  $binary_remote_addr  10m;
+					 
+					server {
+					  location /download/ {
+					  limit_conn   one  1;
+					}
+					这将指定一个地址只能同时存在一个连接。
+		HTTP Limit Requests模块（HTTP Limit Requests）
+			a.摘要
+				这个模块允许为一个指定的会话或者某个特殊情况限制请求数目。
+				·示例配置
+				 http {
+				    limit_req_zone  $binary_remote_addr  zone=one:10m   rate=1r/s;
+				    ...
+				    server {
+				        ...
+				 
+				        location /search/ {
+				            limit_req   zone=one  burst=5;
+				        }
+
+			b.指令
+				* : limit_req_log_level
+					语法：limit_req_log_level info|notice|warn|error 
+					默认值：warn 
+					使用字段：http 
+					指定记录日志的等级。
+
+				* : limit_req_zone
+					语法：limit_req_zone $session_variable zone=name_of_zone:size rate=rate 
+					默认值：none 
+					使用字段：http 
+					指令描述会话状态存储区域。
+					指令描述会话状态存储的某个区域，会话的值根据给定的变量，如下例：
+					limit_req_zone  $binary_remote_addr  zone=one:10m   rate=1r/s;
+					在这种情况下，将为一个名为“one”的区域分配10MB，这个区域的平均查询速度为每秒最多1个请求。
+					会话将追踪每个用户，但是注意它替换了变量$remote_addr，我们使用的是$binary_remote_addr，减少会话的大小为64字节，一个1MB的区域可以包含大约16000个会话状态。 
+					速度可以设置为每秒处理请求数和每分钟处理请求数，其值必须是整数，所以如果你需要指定每秒处理少于1个的请求，2秒处理一个请求，可以使用 "30r/m"。
+					当会话状态储存区域为1M时理论上可以处理32000个会话，每个会话大小为32字节。
+				* : limit_req
+					语法： limit_req zone=zone burst=burst [nodelay] 
+					默认值：none 
+					使用字段：http, server, location 
+					这个指令指定区域（zone）可能的最大请求爆发值(burst),如果其值超过这个数，请求被延时，以便查询按照给定的速度处理。多余的请求将被延迟直到他们的数目小于burst值，在这种情况下，请求将得到"Service unavailable" (503)代码，默认burst的值为0。
+					如下例：
+					limit_req_zone  $binary_remote_addr  zone=one:10m   rate=1r/s;
+					    server {
+					        location /search/ {
+					            limit_req   zone=one  burst=5;
+					        }
+					允许一个用户平均每秒处理不超过1个请求，这个区域最多同时处理不超过5个查询，如果在burst值之外的额外请求不可用，可以使用nodelay参数：
+					limit_req   zone=one  burst=5  nodelay;
+		日志模块（Log）
+			a.摘要
+				控制nginx如何记录请求日志。
+				例：log_format gzip '$remote_addr - $remote_user [$time_local]  '
+				                '"$request" $status $bytes_sent '
+				                '"$http_referer" "$http_user_agent" "$gzip_ratio"';
+				 
+				access_log  /spool/logs/nginx-access.log  gzip  buffer=32k;
+				关于记录nginx错误日志请参考HTTP核心模块。
+
+			b.指令
+
+				* : access_log
+					语法：access_log path [format [buffer=size | off]] 
+					默认值：access_log log/access.log combined 
+					使用字段：http, server, location 
+					参数为连接日志指定了路径，格式和缓冲区大小。使用“off”将在当前的字段中清除access_log的所有参数，如果没有指定日志格式，默认为“combined”。缓冲区大小不能超过写入磁盘文件的最小大小。
+					日志文件路径可以包含变量（0.7.4以上版本），但是有一些限制：
+					·nginx指定的用户必须有创建日志文件的权限。
+					·缓冲区不会工作
+					·每个到来的连接，日志文件将被打开并且在记录日志后迅速关闭，然而，频繁使用的文件描述符将被保存到open_log_file_cache中，关于日志的轮询记录，必须记住随着时间的过去（使用open_log_file_cache的valid参数设置），日志仍然在旧的文件中记录。
+
+					nginx支持为每个location指定强大的日志记录。同样的连接可以在同一时间输出到不止一个的日志中，更多信息请查看Multiple access_log directives in different contexts
+				* : log_format
+					语法：log_format name format [format ...] 
+					默认值：log_format combined "..." 
+					使用字段：http server 
+					描述记录日志的格式，格式中可以使用大多数变量，也包括一些在写入日志文件过程中定义的变量：
+					·$body_bytes_sent，减去应答头后传送给客户端的字节数，这个变量兼容apache模块mod_log_config的%B参数（在0.3.10前这个变量为$apache_bytes_sent）。
+					·$bytes_sent，传送给客户端的字节数。
+					·$connection，连接数。
+					·$msec，正在写入日志条目的当前时间（精确到百万分之一秒）
+					·$pipe，如果请求为管道的。
+					·$request_length，请求主体的长度。
+					·$request_time，从一个请求发出到而使nginx工作的时间，单位为毫秒（0.5.19版本后可以使用秒为单位）。
+					·$status，应答的状态（代码）。
+					·$time_local，写入普通日志格式的当地时间（服务器时间）。
+
+					传送到客户端的头中的变量以"sent_http_"标记开头，如：$sent_http_content_range。
+					注意其他模块产生的变量同样可以写入日志，例如你可以记录前端负载均衡应答头使用“upstream_http_”开头的变量，具体请查看负载均衡模块。
+					nginx有一个预定的日志格式称为combined：
+					log_format combined '$remote_addr - $remote_user [$time_local]  '
+					                    '"$request" $status $body_bytes_sent '
+					                    '"$http_referer" "$http_user_agent"';
+				* : open_log_file_cache
+					语法：open_log_file_cache max=N [inactive=time] [min_uses=N] [valid=time] | off 
+					默认值：open_log_file_cache off 
+					使用字段：http server location 
+					这个指令为频繁使用的日志文件描述符所在的路径变量设置缓存。
+					指令选项：
+					·max - 缓存中存储的最大文件描述符数。
+					·inactive - 设置缓存中在某个时间段内没有使用的文件描述符将被移除，默认为10秒。
+					·min_uses - 在一定时间内（inactive指定），一个文件描述符最少使用多少次后被放入缓存，默认为1。
+					·valid - 设置检查同名文件存在的时间，默认是60秒。
+					·off - 关闭缓存。
+		Map模块（Map）
+			a.摘要
+				这个模块允许你分类或者同时映射多个值到多个不同值并储存到一个变量中。
+				如下例：
+				map  $http_host  $name  {
+				  hostnames;
+				  default          0;
+				  example.com      1;
+				  *.example.com    1;
+				  test.com         2;
+				  *.test.com       2;
+				  .site.com        3;
+				}
+				一个典型的使用映射的例子是代替一个含有很多服务器的/location或者重定向：
+				map $uri $new {
+				  default        http://www.domain.com/home/;
+				  /aa            http://aa.domain.com/;
+				  /bb            http://bb.domain.com/;
+				  /john          http://my.domain.com/users/john/;
+				} 
+				server {
+				  server_name   www.domain.com;
+				  rewrite  ^    $new   redirect;
+				}
+
+			b.指令
+				* : map
+					语法：map $var1 $var2 { ... } 
+					默认值：none 
+					使用字段：http 
+					指定一个变量使用的映射表，有三个指定的参数：
+					·default - 指定如果没有匹配结果将使用的默认值。
+					·hostnames - 允许对类似主机名的值进行简单的查询匹配，第一个点后面的部分将用作精确的主机名。例如：
+					*.example.com  1; 
+					而不是写成两个：
+					example.com    1;
+					*.example.com  1;
+					可以只写成一条：
+					.example.com   1;
+					·include - 包含一个含有映射值的文件，可以包含多个。
+
+				* : map_hash_max_size
+					语法：map_hash_max_size number 
+					默认值：map_hash_max_size 2048 
+					使用字段：http 
+					这个指令设置映射表对应的哈希表的最大值，更多信息可以参考优化章节。
+
+				* : map_hash_bucket_size
+					语法：map_hash_bucket_size n
+					默认值：map_hash_bucket_size 32/64/128 
+					使用字段：http 
+					这个指令指定一个映射表中的变量在哈希表中的最大值，这个值取决于处理器的缓存，更多信息可以参考优化章节。
+		Memcached模块（Memcached）
+			a.摘要
+				使用这个模块简单的处理缓存，这个模块将不断的进行完善。
+				示例配置：
+				server {
+				  location / {
+				    set $memcached_key $uri;
+				    memcached_pass     name:11211;
+				    default_type       text/html;
+				    error_page         404 = /fallback;
+				  }
+				  location = /fallback {
+				    proxy_pass backend;
+				  }
+				}
+				在nginx0.7.x中：
+				server {
+				  location / {
+				    set $memcached_key $uri;
+				    memcached_pass     name:11211;
+				    default_type       text/html;
+				    error_page         404 @fallback;
+				  }
+				  location @fallback {
+				    proxy_pass backend;
+				  }
+				}
+
+			b.指令
+
+				* : memcached_pass
+					语法：memcached_pass [ name:port ] 
+					默认值：none 
+					使用字段：http, server, location 
+					后端需要在memcached中设置一些数据，memcached key为“"/uri?args”。
+					在0.5.9版本之后memcached key存储在变量$memcached_key中。
+
+				* : memcached_connect_timeout
+					语法：memcached_connect_timeout [ time ] 
+					默认值：60000 
+					使用字段：http, server, location 
+					连接memcached的超时时间，单位为毫秒。
+
+				* : memcached_read_timeout
+					语法：memcached_read_timeout [ time ] 
+					默认值：60000 
+					使用字段：http, server, location 
+					读取memcached数据的超时时间，单位为毫秒。
+
+				* : memcached_send_timeout
+					语法：memcached_send_timeout [ time ] 
+					默认值：60000 
+					使用字段：http, server, location 
+					发送memcached数据的超时时间，单位为毫秒。
+
+				* : memcached_buffer_size
+					语法：memcached_buffer_size [ size ] 
+					默认值：see getpagesize(2) 
+					使用字段：http, server, location 
+					发送/收到的缓冲区大小，单位是字节。
+
+				* : memcached_next_upstream
+					语法：memcached_next_upstream [ error | timeout | invalid_response | not_found | off ] 
+					默认值：error timeout 
+					使用字段：http, server, location 
+					指定在哪种错误状态下请求将转发到另外的负载均衡服务器，仅当memcached_pass有两个或两个以上值的时候使用。
+
+			c.变量
+				* : $memcached_key
+					memcached key的值。
+		HTTP代理模块（HTTP Proxy）
+			a.摘要
+				这个模块可以转发请求到其他的服务器。
+				HTTP/1.0无法使用keepalive（后端服务器将为每个请求创建并且删除连接）。nginx为浏览器发送HTTP/1.1并为后端服务器发送HTTP/1.0，这样浏览器就可以为浏览器处理keepalive。
+				如下例：
+				location / {
+				  proxy_pass        http://localhost:8000;
+				  proxy_set_header  X-Real-IP  $remote_addr;
+				}
+				注意当使用http proxy模块（甚至FastCGI），所有的连接请求在发送到后端服务器之前nginx将缓存它们，因此，在测量从后端传送的数据时，它的进度显示可能不正确。
+
+			b.指令
+
+			    * : proxy_buffer_size
+					语法：proxy_buffer_size the_size 
+					默认值：proxy_buffer_size 4k/8k 
+					使用字段：http, server, location 
+					设置从被代理服务器读取的第一部分应答的缓冲区大小。
+					通常情况下这部分应答中包含一个小的应答头。
+					默认情况下这个值的大小为指令proxy_buffers中指定的一个缓冲区的大小，不过可以将其设置为更小。
+
+				* : proxy_buffering
+					语法：proxy_buffering on|off 
+					默认值：proxy_buffering on 
+					使用字段：http, server, location 
+					为后端的服务器启用应答缓冲。
+					如果启用缓冲，nginx假设被代理服务器能够非常快的传递应答，并将其放入缓冲区，可以使用 proxy_buffer_size和proxy_buffers设置相关参数。
+					如果响应无法全部放入内存，则将其写入硬盘。
+					如果禁用缓冲，从后端传来的应答将立即被传送到客户端。
+					nginx忽略被代理服务器的应答数目和所有应答的大小，接受proxy_buffer_size所指定的值。
+					对于基于长轮询的Comet应用需要关闭这个指令，否则异步的应答将被缓冲并且Comet无法正常工作。
+
+				* : proxy_buffers
+					语法：proxy_buffers the_number is_size; 
+					默认值：proxy_buffers 8 4k/8k; 
+					使用字段：http, server, location 
+					设置用于读取应答（来自被代理服务器）的缓冲区数目和大小，默认情况也为分页大小，根据操作系统的不同可能是4k或者8k。
+
+				* : proxy_busy_buffers_size
+					语法：proxy_busy_buffers_size size; 
+					默认值：proxy_busy_buffers_size ["#proxy buffer size"] * 2; 
+					使用字段：http, server, location, if 
+					未知。
+
+				* : proxy_cache
+					语法：proxy_cache zone_name; 
+					默认值：None 
+					使用字段：http, server, location 
+					设置一个缓存区域的名称，一个相同的区域可以在不同的地方使用。
+					在0.7.48后，缓存遵循后端的"Expires", "Cache-Control: no-cache", "Cache-Control: max-age=XXX"头部字段，0.7.66版本以后，"Cache-Control:"private"和"no-store"头同样被遵循。nginx在缓存过程中不会处理"Vary"头，为了确保一些私有数据不被所有的用户看到，后端必须设置 "no-cache"或者"max-age=0"头，或者proxy_cache_key包含用户指定的数据如$cookie_xxx，使用cookie的值作为proxy_cache_key的一部分可以防止缓存私有数据，所以可以在不同的location中分别指定proxy_cache_key的值以便分开私有数据和公有数据。
+					缓存指令依赖代理缓冲区(buffers)，如果proxy_buffers设置为off，缓存不会生效。
+
+				* : proxy_cache_key
+					语法：proxy_cache_key line; 
+					默认值：$scheme$proxy_host$request_uri; 
+					使用字段：http, server, location 
+					指令指定了包含在缓存中的缓存关键字。
+					proxy_cache_key "$host$request_uri$cookie_user";
+					注意默认情况下服务器的主机名并没有包含到缓存关键字中，如果你为你的站点在不同的location中使用二级域，你可能需要在缓存关键字中包换主机名：
+					proxy_cache_key "$scheme$host$request_uri";
+
+				* : proxy_cache_path
+					语法：proxy_cache_path path [levels=number] keys_zone=zone_name:zone_size [inactive=time] [max_size=size]; 
+					默认值：None 
+					使用字段：http 
+					指令指定缓存的路径和一些其他参数，缓存的数据存储在文件中，并且使用代理url的哈希值作为关键字与文件名。levels参数指定缓存的子目录数，例如：
+					proxy_cache_path  /data/nginx/cache  levels=1:2   keys_zone=one:10m;
+					文件名类似于：
+					/data/nginx/cache/c/29/b7f54b2df7773722d382f4809d65029c 
+
+					可以使用任意的1位或2位数字作为目录结构，如 X, X:X,或X:X:X e.g.: "2", "2:2", "1:1:2"，但是最多只能是三级目录。
+					所有活动的key和元数据存储在共享的内存池中，这个区域用keys_zone参数指定。
+					注意每一个定义的内存池必须是不重复的路径，例如：
+					proxy_cache_path  /data/nginx/cache/one    levels=1      keys_zone=one:10m;
+					proxy_cache_path  /data/nginx/cache/two    levels=2:2    keys_zone=two:100m;
+					proxy_cache_path  /data/nginx/cache/three  levels=1:1:2  keys_zone=three:1000m;
+					如果在inactive参数指定的时间内缓存的数据没有被请求则被删除，默认inactive为10分钟。
+					一个名为cache manager的进程控制磁盘的缓存大小，它被用来删除不活动的缓存和控制缓存大小，这些都在max_size参数中定义，当目前缓存的值超出max_size指定的值之后，超过其大小后最少使用数据（LRU替换算法）将被删除。
+					内存池的大小按照缓存页面数的比例进行设置，一个页面（文件）的元数据大小按照操作系统来定，FreeBSD/i386下为64字节，FreeBSD/amd64下为128字节。
+					proxy_cache_path和proxy_temp_path应该使用在相同的文件系统上。
+
+				* : proxy_cache_methods
+					语法：proxy_cache_methods [GET HEAD POST]; 
+					默认值：proxy_cache_methods GET HEAD; 
+					使用字段：http, server, location 
+					GET/HEAD用来装饰语句，即你无法禁用GET/HEAD即使你只使用下列语句设置：
+					proxy_cache_methods POST;
+
+				* : proxy_cache_min_uses
+					语法：proxy_cache_min_uses the_number; 
+					默认值：proxy_cache_min_uses 1; 
+					使用字段：http, server, location 
+					多少次的查询后应答将被缓存，默认1。
+
+				* : proxy_cache_valid
+					语法：proxy_cache_valid reply_code [reply_code ...] time; 
+					默认值：None 
+					使用字段：http, server, location 
+					为不同的应答设置不同的缓存时间，例如：
+					  proxy_cache_valid  200 302  10m;
+					  proxy_cache_valid  404      1m;
+					为应答代码为200和302的设置缓存时间为10分钟，404代码缓存1分钟。
+					如果只定义时间：
+					 proxy_cache_valid 5m;
+					那么只对代码为200, 301和302的应答进行缓存。
+					同样可以使用any参数任何应答。
+					  proxy_cache_valid  200 302 10m;
+					  proxy_cache_valid  301 1h;
+					  proxy_cache_valid  any 1m;
+
+				* : proxy_cache_use_stale
+					语法：proxy_cache_use_stale [error|timeout|updating|invalid_header|http_500|http_502|http_503|http_504|http_404|off] [...]; 
+					默认值：proxy_cache_use_stale off; 
+					使用字段：http, server, location 
+					这个指令告诉nginx何时从代理缓存中提供一个过期的响应，参数类似于proxy_next_upstream指令。
+					为了防止缓存失效（在多个线程同时更新本地缓存时），你可以指定'updating'参数，它将保证只有一个线程去更新缓存，并且在这个线程更新缓存的过程中其他的线程只会响应当前缓存中的过期版本。
+
+				* : proxy_connect_timeout
+					语法：proxy_connect_timeout timeout_in_seconds 
+					默认值：proxy_connect_timeout 60 
+					使用字段：http, server, location 
+					指定一个连接到代理服务器的超时时间，需要注意的是这个时间最好不要超过75秒。
+					这个时间并不是指服务器传回页面的时间（这个时间由proxy_read_timeout声明）。如果你的前端代理服务器是正常运行的，但是遇到一些状况（例如没有足够的线程去处理请求，请求将被放在一个连接池中延迟处理），那么这个声明无助于服务器去建立连接。
+
+				* : proxy_headers_hash_bucket_size
+					语法：proxy_headers_hash_bucket_size size; 
+					默认值：proxy_headers_hash_bucket_size 64; 
+					使用字段：http, server, location, if 
+					设置哈希表中存储的每个数据大小（参考解释）。
+
+				* : proxy_headers_hash_max_size
+					语法：proxy_headers_hash_max_size size; 
+					默认值：proxy_headers_hash_max_size 512; 
+					使用字段：http, server, location, if 
+					设置哈希表的最大值（参考解释）。
+
+				* : proxy_hide_header
+					语法：proxy_hide_header the_header 
+					使用字段：http, server, location 
+					nginx不对从被代理服务器传来的"Date", "Server", "X-Pad"和"X-Accel-..."应答进行转发，这个参数允许隐藏一些其他的头部字段，但是如果上述提到的头部字段必须被转发，可以使用proxy_pass_header指令，例如：需要隐藏MS-OfficeWebserver和AspNet-Version可以使用如下配置：
+					location / {
+					  proxy_hide_header X-AspNet-Version;
+					  proxy_hide_header MicrosoftOfficeWebServer;
+					}
+					当使用X-Accel-Redirect时这个指令非常有用。例如，你可能要在后端应用服务器对一个需要下载的文件设置一个返回头，其中X-Accel-Redirect字段即为这个文件，同时要有恰当的Content-Type，但是，重定向的URL将指向包含这个文件的文件服务器，而这个服务器传递了它自己的Content-Type，可能这并不是正确的，这样就忽略了后端应用服务器传递的Content-Type。为了避免这种情况你可以使用这个指令：
+					location / {
+					  proxy_pass http://backend_servers;
+					}
+					 
+					location /files/ {
+					  proxy_pass http://fileserver;
+					  proxy_hide_header Content-Type;
+
+					proxy_ignore_client_abort
+
+					语法：proxy_ignore_client_abort [ on|off ] 
+					默认值：proxy_ignore_client_abort off 
+					使用字段：http, server, location 
+					防止在客户端自己终端请求的情况下中断代理请求。
+
+				* : proxy_ignore_headers
+					语法：proxy_ignore_headers name [name ...] 
+					默认值：none 
+					使用字段：http, server, location 
+					这个指令(0.7.54+) 禁止处理来自代理服务器的应答。
+					可以指定的字段为"X-Accel-Redirect", "X-Accel-Expires", "Expires"或"Cache-Control"。
+
+				* : proxy_intercept_errors
+					语法：proxy_intercept_errors [ on|off ] 
+					默认值：proxy_intercept_errors off 
+					使用字段：http, server, location 
+					使nginx阻止HTTP应答代码为400或者更高的应答。
+					默认情况下被代理服务器的所有应答都将被传递。 
+					如果将其设置为on则nginx会将阻止的这部分代码在一个error_page指令处理，如果在这个error_page中没有匹配的处理方法，则被代理服务器传递的错误应答会按原样传递。
+
+				* : proxy_max_temp_file_size
+					语法：proxy_max_temp_file_size size; 
+					默认值：proxy_max_temp_file_size 1G; 
+					使用字段：http, server, location, if 
+					当代理缓冲区过大时使用一个临时文件的最大值，如果文件大于这个值，将同步传递请求而不写入磁盘进行缓存。
+					如果这个值设置为零，则禁止使用临时文件。
+
+				* : proxy_method
+					语法：proxy_method [method] 
+					默认值：None 
+					使用字段：http, server, location 
+					为后端服务器忽略HTTP请求处理方式，假如你将这个指令指定为POST，那么所有转发到后端的请求都将使用POST请求方式。
+					示例配置：
+					  proxy_method POST;
+
+				* : proxy_next_upstream
+					语法： proxy_next_upstream [error|timeout|invalid_header|http_500|http_502|http_503|http_504|http_404|off] 
+					默认值：proxy_next_upstream error timeout 
+					使用字段：http, server, location 
+					确定在何种情况下请求将转发到下一个服务器：
+					·error - 在连接到一个服务器，发送一个请求，或者读取应答时发生错误。
+					·timeout - 在连接到服务器，转发请求或者读取应答时发生超时。
+					·invalid_header - 服务器返回空的或者错误的应答。
+					·http_500 - 服务器返回500代码。
+					·http_502 - 服务器返回502代码。
+					·http_503 - 服务器返回503代码。
+					·http_504 - 服务器返回504代码。
+					·http_404 - 服务器返回404代码。
+					·off - 禁止转发请求到下一台服务器。
+
+					转发请求只发生在没有数据传递到客户端的过程中。
+					
+				* : proxy_no_cache
+					语法：proxy_no_cache variable1 variable2 ...; 
+					默认值：None 
+					使用字段：http, server, location 
+					确定在何种情况下缓存的应答将不会使用，示例：
+					proxy_no_cache $cookie_nocache  $arg_nocache$arg_comment;
+					proxy_no_cache $http_pragma     $http_authorization;
+					如果为空字符串或者等于0，表达式的值等于false，例如，在上述例子中，如果在请求中设置了cookie "nocache"，请求将总是穿过缓存而被传送到后端。
+					注意：来自后端的应答依然有可能符合缓存条件，有一种方法可以快速的更新缓存中的内容，那就是发送一个拥有你自己定义的请求头部字段的请求。例如：My-Secret-Header，那么在proxy_no_cache指令中可以这样定义：
+					proxy_no_cache $http_my_secret_header;
+
+				* : proxy_pass
+					语法：proxy_pass URL 
+					默认值：no 
+					使用字段：location, location中的if字段 
+					这个指令设置被代理服务器的地址和被映射的URI，地址可以使用主机名或IP加端口号的形式，例如：
+					proxy_pass http://unix:/path/to/backend.socket:/uri/;
+					路径在unix关键字的后面指定，位于两个冒号之间。
+					当传递请求时，Nginx将location对应的URI部分替换成proxy_pass指令中所指定的部分，但是有两个例外会使其无法确定如何去替换：
+					·location通过正则表达式指定；
+					·在使用代理的location中利用rewrite指令改变URI，使用这个配置可以更加精确的处理请求（break）：
+					location  /name/ {
+					  rewrite      /name/([^/] +)  /users?name=$1  break;
+					  proxy_pass   http://127.0.0.1;
+					}
+					这些情况下URI并没有被映射传递。
+					此外，需要标明一些标记以便URI将以和客户端相同的发送形式转发，而不是处理过的形式，在其处理期间：
+					·两个以上的斜杠将被替换为一个： "//" -- "/"; 
+					·删除引用的当前目录："/./" -- "/"; 
+					·删除引用的先前目录："/dir /../" -- "/"。
+
+					如果在服务器上必须以未经任何处理的形式发送URI，那么在proxy_pass指令中必须使用未指定URI的部分：
+					location  /some/path/ {
+					  proxy_pass   http://127.0.0.1;
+					}
+					在指令中使用变量是一种比较特殊的情况：被请求的URL不会使用并且你必须完全手工标记URL。
+					这意味着下列的配置并不能让你方便的进入某个你想要的虚拟主机目录，代理总是将它转发到相同的URL（在一个server字段的配置）：
+					location / {
+					  proxy_pass   http://127.0.0.1:8080/VirtualHostBase/https/$server_name:443/some/path/VirtualHostRoot;
+					}
+					解决方法是使用rewrite和proxy_pass的组合：
+					location / {
+					  rewrite ^(.*)$ /VirtualHostBase/https/$server_name:443/some/path/VirtualHostRoot$1 break;
+					  proxy_pass   http://127.0.0.1:8080;
+					}
+					这种情况下请求的URL将被重写， proxy_pass中的拖尾斜杠并没有实际意义。
+				* : proxy_pass_header
+					语法：proxy_pass_header the_name 
+					使用字段：http, server, location 
+					这个指令允许为应答转发一些隐藏的头部字段。
+					如：
+					location / {
+					  proxy_pass_header X-Accel-Redirect;
+					}
+
+				* : proxy_pass_request_body
+					语法：proxy_pass_request_body [ on | off ] ; 
+					默认值：proxy_pass_request_body on; 
+					使用字段：http, server, location 
+					可用版本：0.1.29
+
+				* : proxy_pass_request_headers
+					语法：proxy_pass_request_headers [ on | off ] ; 
+					默认值：proxy_pass_request_headers on; 
+					使用字段：http, server, location 
+					可用版本：0.1.29
+
+				* : proxy_redirect
+					语法：proxy_redirect [ default|off|redirect replacement ] 
+					默认值：proxy_redirect default 
+					使用字段：http, server, location 
+					如果需要修改从被代理服务器传来的应答头中的"Location"和"Refresh"字段，可以用这个指令设置。
+					假设被代理服务器返回Location字段为： http://localhost:8000/two/some/uri/
+					这个指令：
+					proxy_redirect http://localhost:8000/two/ http://frontend/one/;
+					将Location字段重写为http://frontend/one/some/uri/。
+					在代替的字段中可以不写服务器名：
+					proxy_redirect http://localhost:8000/two/ /;
+					这样就使用服务器的基本名称和端口，即使它来自非80端口。
+					如果使用“default”参数，将根据location和proxy_pass参数的设置来决定。
+					例如下列两个配置等效：
+					location /one/ {
+					  proxy_pass       http://upstream:port/two/;
+					  proxy_redirect   default;
+					}
+					 
+					location /one/ {
+					  proxy_pass       http://upstream:port/two/;
+					  proxy_redirect   http://upstream:port/two/   /one/;
+					}
+					在指令中可以使用一些变量：
+					proxy_redirect   http://localhost:8000/    http://$host:$server_port/;
+					这个指令有时可以重复：
+					  proxy_redirect   default;
+					  proxy_redirect   http://localhost:8000/    /;
+					  proxy_redirect   http://www.example.com/   /;
+					参数off将在这个字段中禁止所有的proxy_redirect指令：
+					  proxy_redirect   off;
+					  proxy_redirect   default;
+					  proxy_redirect   http://localhost:8000/    /;
+					  proxy_redirect   http://www.example.com/   /;
+					利用这个指令可以为被代理服务器发出的相对重定向增加主机名：
+					proxy_redirect   /   /;
+
+				* : proxy_read_timeout
+					语法：proxy_read_timeout time 
+					默认值：proxy_read_timeout 60 
+					使用字段：http, server, location 
+					决定读取后端服务器应答的超时时间，它决定nginx将等待多久时间来取得一个请求的应答。超时时间是指完成了两次握手后并且状态为established的超时时间。
+					相对于proxy_connect_timeout，这个时间可以扑捉到一台将你的连接放入连接池延迟处理并且没有数据传送的服务器，注意不要将此值设置太低，某些情况下代理服务器将花很长的时间来获得页面应答（例如如当接收一个需要很多计算的报表时），当然你可以在不同的location里面设置不同的值。
+
+				* : proxy_redirect_errors
+					不推荐使用，请使用 proxy_intercept_errors。
+					
+				* : proxy_send_lowat
+					语法：proxy_send_lowat [ on | off ] 
+					默认值：proxy_send_lowat off; 
+					使用字段：http, server, location, if 
+					设置SO_SNDLOWAT，这个指令仅用于FreeBSD。
+
+				* : proxy_send_timeout
+					语法：proxy_send_timeout seconds 
+					默认值：proxy_send_timeout 60 
+					使用字段：http, server, location 
+					设置代理服务器转发请求的超时时间，同样指完成两次握手后的时间，如果超过这个时间代理服务器没有数据转发到被代理服务器，nginx将关闭连接。
+
+				* : proxy_set_body
+					语法：proxy_set_body [ on | off ] 
+					默认值：proxy_set_body off; 
+					使用字段：http, server, location, if 
+					可用版本：0.3.10。
+
+				* : proxy_set_header
+					语法：proxy_set_header header value 
+					默认值： Host and Connection
+					使用字段：http, server, location 
+					这个指令允许将发送到被代理服务器的请求头重新定义或者增加一些字段。
+					这个值可以是一个文本，变量或者它们的组合。
+					proxy_set_header在指定的字段中没有定义时会从它的上级字段继承。
+					默认只有两个字段可以重新定义：
+					proxy_set_header Host $proxy_host;
+					proxy_set_header Connection Close;
+					未修改的请求头“Host”可以用如下方式传送：
+					proxy_set_header Host $http_host;
+					但是如果这个字段在客户端的请求头中不存在，那么不发送数据到被代理服务器。
+					这种情况下最好使用$Host变量，它的值等于请求头中的"Host"字段或服务器名：
+					proxy_set_header Host $host;
+					此外，可以将被代理的端口与服务器名称一起传递：
+					proxy_set_header Host $host:$proxy_port;
+					如果设置为空字符串，则不会传递头部到后端，例如下列设置将禁止后端使用gzip压缩：
+					proxy_set_header  Accept-Encoding  "";
+
+				* : proxy_store
+					语法：proxy_store [on | off | path] 
+					默认值：proxy_store off 
+					使用字段：http, server, location 
+					这个指令设置哪些传来的文件将被存储，参数"on"保持文件与alias或root指令指定的目录一致，参数"off"将关闭存储，路径名中可以使用变量：
+					proxy_store   /data/www$original_uri;
+					应答头中的"Last-Modified"字段设置了文件最后修改时间，为了文件的安全，可以使用proxy_temp_path指定一个临时文件目录。
+					这个指令为那些不是经常使用的文件做一份本地拷贝。从而减少被代理服务器负载。
+					location /images/ {
+					  root                 /data/www;
+					  error_page           404 = /fetch$uri;
+					}
+					location /fetch {
+					  internal;
+					  proxy_pass           http://backend;
+					  proxy_store          on;
+					  proxy_store_access   user:rw  group:rw  all:r;
+					  proxy_temp_path      /data/temp;
+					  alias                /data/www;
+					}
+					或者通过这种方式：
+					location /images/ {
+					  root                 /data/www;
+					  error_page           404 = @fetch;
+					}
+					 
+					location @fetch {
+					  internal;
+					 
+					  proxy_pass           http://backend;
+					  proxy_store          on;
+					  proxy_store_access   user:rw  group:rw  all:r;
+					  proxy_temp_path      /data/temp;
+					 
+					  root                 /data/www;
+					}
+					注意proxy_store不是一个缓存，它更像是一个镜像。
+
+				* : proxy_store_access
+					语法：proxy_store_access users:permissions [users:permission ...] 
+					默认值：proxy_store_access user:rw 
+					使用字段：http, server, location 
+					指定创建文件和目录的相关权限，如：
+					proxy_store_access  user:rw  group:rw  all:r;
+					如果正确指定了组和所有的权限，则没有必要去指定用户的权限：
+					proxy_store_access  group:rw  all:r;
+
+				* : proxy_temp_file_write_size
+					语法：proxy_temp_file_write_size size; 
+					默认值：proxy_temp_file_write_size ["#proxy buffer size"] * 2; 
+					使用字段：http, server, location, if 
+					设置在写入proxy_temp_path时数据的大小，在预防一个工作进程在传递文件时阻塞太长。
+
+				* : proxy_temp_path
+					语法：proxy_temp_path dir-path [ level1 [ level2 [ level3 ] ; 
+					默认值：在configure时由--http-proxy-temp-path指定 
+					使用字段：http, server, location 
+					类似于http核心模块中的client_body_temp_path指令，指定一个地址来缓冲比较大的被代理请求。
+
+					proxy_upstream_fail_timeout
+
+					0.5.0版本后不推荐使用，请使用http负载均衡模块中server指令的fail_timeout参数。
+
+					proxy_upstream_fail_timeout
+
+					0.5.0版本后不推荐使用，请使用http负载均衡模块中server指令的max_fails参数。
+
+			c.变量
+
+					该模块中包含一些内置变量，可以用于proxy_set_header指令中以创建头部。
+				* : $proxy_host
+					被代理服务器的主机名与端口号。
+
+				* : $proxy_host
+					被代理服务器的端口号。
+
+				* : $proxy_add_x_forwarded_for
+					包含客户端请求头中的"X-Forwarded-For"，与$remote_addr用逗号分开，如果没有"X-Forwarded-For"请求头，则$proxy_add_x_forwarded_for等于$remote_addr。
+		SSI模块（SSI）
+			a.摘要
+				这个模块为处理服务器端包含（SSI）的输入提供一个过滤器，目前所支持的SSI命令并不完善。
+				如下例：
+				location / {
+				  ssi  on;
+				}
+
+			b.指令
+				* : ssi
+					语法：ssi [ on | off ] 
+					默认值：ssi off 
+					使用字段：http, server, location, location中的if字段 
+					启用SSI处理。
+					注意如果启用SSI，那么Last-Modified头和Content-Length头不会传递。
+
+				* : ssi_silent_errors
+					语法：ssi_silent_errors [on|off] 
+					默认值：ssi_silent_errors off 
+					使用字段：http, server, location 
+					如果在处理SSI的过程中出现“[an error occurred while processing the directive]”错误，禁止将其输出。
+
+				* : ssi_types
+					语法：ssi_types mime-type [mime-type ...] 
+					默认值：ssi_types text/html 
+					使用字段：http, server, location 
+					默认只解析text/html类型，这个参数可以指定其他的MIME类型。
+
+				* : ssi_value_length
+					语法：ssi_value_length length 
+					默认值：ssi_value_length 256 
+					使用字段：http, server, location 
+					定义允许SSI使用的参数值的长度。
+
+			c.SSI 命令
+
+				命令格式如下：
+				  <!--#  command parameter1=value parameter2=value... -->
+				支持的SSI命令如下：
+
+				* : block
+					命令描述一个可以在include命令中使用的块，在块中可以存在SSI命令。
+					·name - 块的名称，如：
+					  <!--# block name="one" -->
+					  the silencer
+					  <!--# endblock ---->
+
+				* : config
+					为SSI指定一些配置参数。
+					·errmsg - 在SSI处理过程中得到的错误字段，默认字符串为：[an error occurred while processing the directive]。
+					·timefmt - 时间字符串的格式，strftime(3)函数使用，默认为：
+					  "%A, %d-%b-%Y %H:%M:%S %Z"
+					在时间中包含秒可以使用“%s”
+
+				* : echo
+					打印一个变量。
+					·var - 变量的名称。
+					·default - 如果变量为空，则显示这个字符串，默认为“none”。如：
+					  <!--# echo var="name" default="no" -->
+					与下列等效：
+					  <!--# if expr="$name" --><!--# echo var="name" --><!--# else -->no<!--# endif -->
+					if/elif/else/endif
+					根据条件包含其他字段或者指令，用法：
+					  <!--# if expr="..." -->
+					  ...
+					  <!--# elif expr="..." -->
+					  ...
+					  <!--# else -->
+					  ...
+					  <!--# endif -->
+					上述例子中只有一个嵌套为真。
+					·expr - 判定一个表达式，可以是变量：
+					  <!--# if expr="$name" -->
+					比较字符串：
+					  <!--# if expr="$name = text" -->
+					  <!--# if expr="$name != text" -->
+					或者匹配正则：
+					  <!--# if expr="$name = /text/" -->
+					  <!--# if expr="$name != /text/" -->
+					如果使用变量，则用他们的值代替。
+
+				* : include
+					包含一个其他来源的记录。
+					·file - 包含一个文件，如：
+					  <!--# include file="footer.html" -->
+					·virtual - 包含一个请求，如：
+					  <!--# include virtual="/remote/body.php?argument=value" -->
+					"file"和"virtual"主要是一些历史性的差别，"file"等同于暗示"wait"选项的"virtual"，在某点上反映与apache等值，但是现在他们基本都处理同样的操作，都可以处理一个URI或者一个静态文件。
+					多个请求将并行发出，如果需要按顺序发出，请使用“wait”选项
+					·stub - 如果请求为空或返回一个错误后使用的默认块。
+					  <!--# block name="one" --> <!--# endblock -->
+					  <!--# include virtual="/remote/body.php?argument=value" stub="one" -->
+					·wait - 当设置为yes时，在当前的请求未完成之前剩余的SSI不会进行判定，例如：
+					  <!--# include virtual="/remote/body.php?argument=value" wait="yes" -->
+
+				* : set
+					设置一个变量。
+					·var - 变量。
+					·value - 包含变量名变量的值，它们将被判定。
+
+			d.变量
+
+				* : $date_local
+					本地时区的当前时间，选项 "timefmt"可以指定格式。
+
+				* : $date_gmt
+					当前的格林尼治时间，选项 "timefmt"可以指定格式。
+
+		User ID模块（User ID）（开启在客户端会显示设置的cookie信息Set-Cookie:uid=wKgBe1ebCgqi5g41AwMDAg==; domain=example.com; path=/）
+			a.摘要
+				模块ngx_http_userid_module为连接发布cookie，主要使用$uid_got和$uid_set变量，注意：$uid_got无法$uid_set在SSI中取得，因为SSI过滤模块工作在userid模块过滤之前。
+				这个模块相当于Apache的mod_uid模块。
+				示例配置：
+					userid          on;
+					userid_name     uid;
+					userid_domain   example.com;
+					userid_path     /;
+					userid_expires  365d;
+					userid_p3p      'policyref="/w3c/p3p.xml", CP="CUR ADM OUR NOR STA NID"';
+
+			b.指令
+
+				* ： userid
+					语法：userid [on|v1|log||off] 
+					默认值：userid off 
+					使用字段：http, server, location 
+					是否启用发出cookie或者记录到被请求的cookie：
+					·on - 启用版本2的cookie并记录。
+					·v1 - 启用版本1的cookie并记录。
+					·log - 不传送cookie，但是写入日志。
+					·off - 禁用cookie。
+
+				* ： userid_domain
+					语法：userid_domain [ name | none ] 
+					默认值：userid_domain none 
+					使用字段：http, server, location 
+					指定cookie的域名，参数“none”不对任何域名发出cookie。
+
+				* ： userid_expires
+					语法：userid_expires [ time | max ] 
+					默认值：none 
+					使用字段：http, server, location 
+					设置cookie的过期时间。
+					参数设置并发出浏览器对于cookie的实效时间，值“max”指定过期时间为：2037年12月31日23:55:55 GMT，这是某些旧浏览器所能识别的最大时间。
+
+				* ： userid_name
+					语法：userid_name name 
+					默认值：userid_name uid 
+					使用字段：http, server, location 
+					设置cookie的名称。
+
+				* ： userid_p3p
+					语法：userid_p3p line 
+					默认值：none 
+					使用字段：http, server, location 
+					为和cookie一起传递的P3P头指定一个值。
+
+				* ： userid_path
+					语法：userid_path path 
+					默认值：userid_path / 
+					使用字段：http, server, location 
+					设置cookie路径。
+
+				* ： userid_service
+					语法：userid_service number 
+					默认值：userid_service address 
+					使用字段：http, server, location 
+					设置cookie发布的服务器地址，如果不设置，版本一的cookie将其设置为0，版本二将其设置为服务器IP。
+
+		uWSGI模块（User ID）
+				a.摘要
+
+					为uwsgi协议提供支持。
+					示例配置：
+					 location / {
+					    uwsgi_pass unix:///var/run/example.com.sock;
+					    include uwsgi_params;
+					  }
+					注意不要把uwsgi协议和uWSGI服务器混淆。
+
+				b.指令
+
+					* : uwsgi_pass
+						语法：uwsgi_pass uri
+						默认值：none 
+						使用字段：server, location
+						为一个uwsgi兼容服务器设置监听地址（tcp套接字，unix套接字或者流块）
+
+					* : uwsgi_param
+						语法：uwsgi_param key value
+						默认值：none 
+						使用字段：server, location
+						为一个uwsgi请求增加一对key/value值。
+						示例：
+						  location / {
+						    uwsgi_pass unix:///var/run/example.com.sock;
+						    include uwsgi_params;
+						    uwsgi_param NEW_VAR foo;
+						  }
+
+					* ： uwsgi_modifier1
+						语法：uwsgi_modifier1 value 
+						默认值：0 
+						使用字段：server, location
+						为一个uwsgi请求设置第一个修饰语（默认为一个WSGI请求）。
+
+				    * ： uwsgi_modifier2
+						语法：uwsgi_modifier2 value 
+						默认值：0 
+						使用字段：server, location
+						为一个uwsgi请求设置第二个修饰语。
+
+					* ： uwsgi_string
+						语法：uwsgi_string string 
+						默认值： none 
+						使用字段：server, location
+						为一个uwsgi请求增加一个字符串。
+						示例（为一个支持eval修饰语的uwsgi兼容服务器）：
+						  location / {
+						    uwsgi_pass unix:///var/run/example.com.sock;
+						    uwsgi_pass_request_headers off;
+						    uwsgi_pass_request_body off;
+						    uwsgi_string "
+							    import uwsgi
+								uwsgi.start_response('200 OK', [('Content-type','text/plain')])
+								total = 30+22
+								uwsgi.send("30 + 22 = %d" % total)
+								";
+						    uwsgi_modifier1 22;
+						    uwsgi_modifier2 0;
+						 
+						  }
+
+					* ： uwsgi_pass_request_headers
+						语法：uwsgi_pass_request_headers on/off 
+						默认值：on 
+						使用字段：server, location
+						在uwsgi请求中传递HTTP请求头。
+
+					* ： uwsgi_pass_request_body
+						语法：uwsgi_pass_request_body on/off 
+						默认值：on 
+						使用字段：server, location
+						在uwsgi请求中传递HTTP请求实体（如果其可用）。
+		SplitClients模块（SplitClients）
+				a.摘要
+					ngx-http-split-clients模块基于一些特定条件分开客户端连接，(例如ip地址,请求头,cookies等)
+					示例配置：
+					http {
+					    split-clients "${remote-addr}AAA" $variant {
+					        0.5% .one;
+					        2.0% .two;
+					        - "";
+					    }
+					 
+					    server {
+					        location / {
+					             index index${variant}.html;
+					可以使用$cookie-...作为来源来分离请求，来源字符串使用CRC32进行哈希计算并且哈希百分比将作为来源的值。
+
+				b.指令
+					* : split-clients
+						语法：split-clients $variable { ... } 
+						默认值：none
+						使用字段：http
+		HTTP Addition模块（HTTP Addition）
+				a.摘要
+					这个模块可以在当前的location之前或者之后增加别的location。
+					它作为一个输出过滤器执行，包含到其他location中的主请求和子请求不会被完全缓冲，并且仍然以流的形式传递到客户端，因为最终应答体的长度在传递HTTP头的时候是未知的，HTTP的chunked编码总是在这里使用。
+					安装
+
+					默认情况下这个模块是没有编译的，如果要使用则需要在编译时指定下列参数：
+					./configure --with-http_addition_module
+					示例配置：
+					location / {
+					  add_before_body   /before_action;
+					  add_after_body    /after_action;
+
+				b.一些限制
+					在0.8.17版本中如果当前的location请求一个请求自身的子请求，包含的location不会被添加。如以下配置：
+					location /foo {
+					  add_before_body /bar;
+					}
+					 
+					location /bar {
+					  add_before_body  /baz;
+					}
+					连接到/foo的请求并不会将/baz对应的location添加到字段中。
+					同样注意，在定义需要包含的location时只能使用字符串，而不能使用变量，所以以下配置：
+					location / {
+					  set $before_action /before_action;
+					  add_before_body $before_action;
+					}
+					并不能正常工作（虽然在测试配置文件正确性的时候可以通过）
+
+				c.指令
+
+					* : add_before_body
+						语法：add_before_body uri 
+						默认值：no 
+						使用字段：http, server, location 
+						在应答体的前面增加URI，为一个处理结果发出子请求。
+
+					* : add_after_body
+						语法：add_after_body uri 
+						默认值：no 
+						使用字段：http, server, location 
+						在应答体的后面增加URI，为一个处理结果发出子请求。
+
+					* : addition_types
+						语法：addition_types mime-type [mime-type ...] 
+						默认值：text/html 
+						使用字段：http, server, location 
+						指令（0.7.9）允许增加让该location处理的其他MIME类型（默认为"text/html"）。（0.8.17之前这个指令在源代码中被拼写成"addtion_types"，不过在0.8.17版本后修复了。）
+				d.实例
+					配置文件：
+						server {
+						    listen       80;
+						    server_name  www.aa.com;
+						 
+						    root /data/site/www.aa.com;    
+						 
+						    location / {
+						        add_before_body /2016/10/header.html;
+						        add_after_body  /2016/10/footer.html;
+						    }
+						}
+					三个html文件:
+						以下三个文件，对应请求的主体文件和add_before_body、add_after_body对应的内容
+
+							# cat /data/site/test.aa.com/2016/10/20131001_add.html 
+							<html>
+								<head>
+									<title>I am title</title>
+								</head>
+								<body>
+									ngx_http_addition_module
+								</body>
+							</html>
+
+							# cat /data/site/test.aa.com/2016/10/header.html 
+								I am header!
+
+							# cat /data/site/test.aa.com/2016/10/footer.html 
+								footer - ttlsa
+				访问结果：
+						# curl test.ttlsa.com/2013/10/20131001_add.html           
+						I am header!
+						<html>
+							<head>
+								<title>I am title</title>
+							</head>
+							<body>
+								ngx_http_addition_module
+							</body>
+						</html>
+						footer - ttlsa
+
+
+
 
 三、使用陷阱
 	1.error_page 
 	error_page 404 = /var/www/nginx/index.html;有等号的时候返回是200;
 	error_page 404  /var/www/nginx/index.html;没有等号的时候返回是404
 
-四、变量
 
 	
