@@ -1,0 +1,249 @@
+MySql学习
+1.GRANT和REVOKE命令
+	1.1创建MYSQL用户并进行授权
+		用来管理访问权限，同时还可以用来创建和删除用户。语法命令格式：
+			GRANT priv_type [(column_list)][,priv_type [(column_list)]] ...
+				ON [object_type]{tbl_name | * | *.* | db_name.*}
+				TO user [IDENTIFIED BY [PASSWORD] 'password']
+					[,[IDENTIFIED BY [PASSWORD] 'password']] ...
+			[WITH with_option [with_option] ...]
+		例如：
+			添加用户为jack,口令为jack，登录地址限制为本地，授权SELECT、DELETE、
+			UPDATE和INSERT.
+
+			GRANT SELECT,INSERT,UPDATE,DELETE ON *.* TO 'jack'@'localhost'
+			IDENTIFIED BY 'jack';
+
+			也可以对MySQL用户每小时服务器的连接次数、更新次数、查询次数和用户连接数设定一个上限。
+			我们还是添加一个jack用户，他每小时最多能发出100次查询命令（在这100次查询中，最多只有50次恒心命令），每小时最多连接10次，用户连接数不限制。
+			GRANT SELECT,INSERT,UPDATE,DELETE ON *.* TO 'jack'@'localhost'
+			IDENTIFIED BY 'jack' WITH
+			MAX_QUERIES_PER_HOUR 100
+			MAX_CONNECTIONS_PER_HOUR 10
+			MAX_UPDATES_PER_HOUR 50
+			MAX_USER_CONNECTIONS 0;
+	1.2收回权限和删除用户
+		REVOKE priv_type [(column_list)][,priv_type [(column_list)]] ...
+				ON [object_type]{tbl_name | * | *.* | db_name.*}
+				FROM user [,user] ...
+		REVOKE ALL PRIVILEGES,GRANT OPTION FROM user[,user]...
+		例如：
+			收回上面添加的jack用户的所有权限，
+				REVOKE ALL PRIVILEGES,GRANT OPTION FROM 'jack';
+			REVOKE语句会回收某个用户的权限，但不会删除用户，如果要删除用户就要到mysql.user表中删除对应的记录。
+		使用FLUSH命令让mysql重新加载权限表。
+			例如
+				FLUSH PRIVILEGES;
+	1.3修改密码
+		可以使用UPDATE语句修改密码，比如将jack这个用户的密码更改为111111，代码如下。
+		use mysql;
+		update user set Password=PASSWORD('111111') where user='jack';
+		flush privileges;
+
+		更改密码的第二种方法：
+			SET PASSWORD FOR 'jack' = PASSWORD('222222');
+
+		更改密码的第三种方法：
+			GRANT USAGE ON '*'.'*' TO 'jack' IDENTIFIED BY '111111';
+
+		忘记root密码执行方法：
+			mysqld --skip_grant_tables
+			mysql -u root
+			FLUSH PRIVILEGES;
+			重启mysql服务。
+2.Mysql优化
+	2.1选取最适用的字段属性
+		将表中字段的宽度设置得尽可能小，另外在尽可能的情况下，应该尽可能的吧字段设置为NOT NULL,这样在执行查询的时候数据库就不用去比较NULL的值。
+		对于某些字段，例如'省份'或者性别，可以将他们设置为ENUM类型，在MySQL中，ENUM类型被当做数值类型数据来处理，而数值类型数据处理器来的速度要比文本类型快的多。
+	2.2链接负载
+		back_log参数用来设置MySQL所有的链接数量。该参数只针对到来的TCP/IP连接的侦听队列的大小。
+	2.3最大并发连接数
+		此参数确定并发数据库连接的最大数值，默认值100.可以通过查看max_used_connections参数来检查数据库打开的并发连接的最大数值。执行SHOW STATUS可以得到这个参数。
+	2.4守护进程用户
+		MySQL守护进程应该按非root用户的权限运行，在攻击者通过MySQL安全漏成功的入侵服务器时，这样能够将破坏程度降到最低。虽然常见的做法是以用户mysql的身份运行服务器，但也可以以存在的任何用户省份来运行。只要该用胡是数据目录的拥有者就可以。
+		例如，假定使用用户phpchinadb运行守护进程：
+			./bin/mysql_safe -user=phpchinadb &
+	2.5权限
+		工作中，经常使用简化权限来提查询速度，
+	2.6使用join来代替子查询Subquesries
+		JOIN之所以更有效，是因为MySQL不需要在内存中创建临时表来完成子查询，逻辑上需要多步骤的查询工作。
+	2.7表的优化
+		如果一个表已经用了一段时间，随着更新个删除操作的发生，数据将会变得支离破碎。这样会增加在该表中查询所花的时间，可以使用如下语句修复：
+			OPTIMIZE TABLE tablename;
+		或者在命令提示符下输入:
+			myisamchk -r table;
+	2.8使用索引
+	2.9优化的查询语句
+		索引虽能优化查询，但有时也不起作用。所以，在查询的时候请注意，最好在相同的字段间进行比较，应避免在查询中让MySQL进行自动类型装换，因为装换过程会使索引对于优化的查询无效。
+	2.10使用默认值
+		在尽可能的地方使用列的默认值，只有在默认值不同的时候才插入数据这样可以减少执行INSERT语句所花的时间。
+
+3.MySQL中SQL语句的应用
+	创建示例表：
+		create database student;
+		use student;
+		create table shop(
+			article INT(4) UNSIGNED ZEROFILL DEFAULT '0000' NOT NULL,
+			dealer CHAR(20) DEFAULT '' NOT NULL,
+			price  DOUBLE(16,2)	DEFAULT '0.00' NOT NULL,
+			PRIMARY KEY(article,dealer)
+		);
+		insert into shop values
+		(1,'A',3.45),(1,'B',3.99),(2,'A',10.99),(3,'B',1.45),
+		(3,'C',1.69),(3,'D',1.25),(4,'D',19.95)
+	3.1、SQL语句的基本应用
+		（1）增加记录
+			INSERT INTO 表名(字段名，字段名) values (值，值);
+		（2）删除记录
+			DELETE FROM 表名 WHERE 条件;
+		（3）修改记录
+			UPDATE 表名 SET 字段=值，字段=值 WHERE 条件;
+		（4）查询记录
+			SELECT 字段，字段 FROM 表名 where 条件;
+	3.2、常用列的最大值
+		select MAX(artical) as articale FROM shop;
+	3.3、拥有某列的最大值的行
+		select article,dealer,price from shop where price=(select max(price) from shop);
+		或者
+		select article,dealer,price from shop order by price desc limit 1;
+	3.4、按组排列的最大值
+		select article,max(price) as price from shop group by article;
+	3.5、提取某列在组间的最大值
+		select article,dealer,price from shop s1 where price=(select max(s2.price) from shop s2 where s1.article=s2.article);
+	3.6、使用用户变量
+		select @min_price:=min(price),@max_price:=max(price) from shop;
+
+		select * from shop where price=@min_price or price=@max_price;
+
+	3.7、使用AUTO_INCREMENT
+		create table animal(
+			id MEDIUMINT NOT NULL AUTO_INCREMENT,
+			name CHAR(30) NOT NULL,
+			PRIMARY KEY (ID)
+		) ;
+
+		INSERT INTO animals(anme) values
+		('dog'),('cat'),('penguin'),
+		('lax'),('whale'),('ostrich');
+	3.8常用的字符串函数
+		（1）、CONCAT(str1,str2,...)	
+			select concat('M','y',"SQL");
+				MySQL;
+		(2)、CONCAT_WS(separator,str1,str2,...)
+		代表CONCAT With Separator,是CONCAT()的特殊形式，其中，第一个参数是其他参数的分隔符，分隔符的位置要放在链接的两个字符串之间。分隔符可以是一个字符串，也可以是其他参数。
+			select concat_ws(',','M','y',"SQL");
+				M,y,SQL;
+
+		(3)、LENGTH(str)
+			select LENGTH('MYSQL');
+				5;
+		(4)、LEFT(STR,LEN)
+			返回字符串str最左边的len个字符串，代码如下：
+			select LEFT('MySQL5.0',2);
+				My
+		(5)、RIGHT(str,len)
+			该函数将返回字符串str最右边的len个字符，代码如下：
+			select RIGHT("MySQL5.0",2)
+				.0
+		(6)、SUBSTRING(str,pos)
+			该函数将返回从字符串str的起始位置至pos位置为止的字符串
+			select SUBSTRING("MySQL5.0",2);
+				ySQL5.0
+	LEFT,RIGHT,SUBSTRIING三个函数对于多字节字符串只运算一次，即它们会把汉字认成一个字符。
+		(7)、REPALCE(str,from_str,to_str);
+		该函数返回字符串str,其中子字符串from_str将被字符串to_str代替，如下
+			select REPLACE("www.shopnc.net",'.net','.cn');
+				www.shopnc.cn
+		(8)、REPEAT(str,count)
+		该函数将返回由重复count次的字符串str组成一个字符串。如果count <=0,则返回一个空字符串，如果str或count是NULL,则返回NULL；
+		（9）、REVERSE(str)
+			该函数返回返回颠倒字符顺序的字符串str。
+	3.9、常用的日期和时间函数
+		（1）、TO_DAYS(date)
+			给出一个日期date,返回一个天数(从0年开始到data的天数)，如下：
+			select TO_DAYS('2008-08-08');
+				733627;
+			查询最近15天内的会员注册信息，代码如下：
+			select * from nc_number where TO_DAYS(NOW())-TO_DAYS(FROM_UNIXTIME(regist_time)) <=15
+		(2)、CURRENT_DATE(),CURRENT_TIME()
+		取得当前的日期和时间
+		(3)、FROM_UNIXTIME(),UNIX_TIMESTAMP()
+		时间戳转换函数：
+			FROM_UNIXTIME将时间戳转换为年月日时分秒格式
+			UNIX_TIMESTAMP将年月日时分秒转换为时间戳
+		(4)、UTC_DATE(),UTC_TIME(),UTC_TIMESTAMP()
+			获得当前UTC的日期时间。
+		（5）、YEAR(),MONTH(),DAY(),HOUR(),MINUTE(),SECOND()
+		以上函数将返回所需的年、月、日、时、分、秒。
+		(6)、ADDDATE()
+			在起始时间上加上一定的天数。
+			select ADDDATE('2011-04-13',3);
+				2011-04-16;
+		(7)、SUBDATE()
+			起始时间减去一定的天数
+			select SUBDATE('2011-04-13',3);
+				2011-04-10
+		（8）、DATEDIFF(D1,D2)
+			返回起始时间d1和结束时间d2的天数
+	3.10、导入数据
+		（1）、LOAD DATA INFILE
+			LOAD DATA INFILE语句用于将定界文本文件导入到MySQL表中。
+			格式如下：
+				LOAD DATA [LOW_PRIORITY | CONCURRENT][LOCAL] INFILE 'filename'
+				[REPLACE | IGNORE ] INTO TABLE table_name
+				[CHARACTER SET charset_name]
+				[FIELDS 
+				[TERMINATED BY 'character'][[OPTIONALLY]ENCLOSED BY 'character']
+				[ESCAPED BY 'character']
+				]
+				[LINES 
+				[STARTING BY 'character'][TERMINATED BY 'xharacter']
+				]
+				[IGNORE number lines][SET column_name = expression,...]
+			例如：
+				LOAD DATA LOCAL INFILE 'shop.txt' INTO TABLE shop FIELDS TERMINATED BY ',' ENCLOSED BY '\' ESCAPE BY '\\' LINES TERMINATED BY '\n';
+			注意：
+			* ： 如果不使用LOCAL,则执行用户必须拥有FILE权限。
+			* ： 使用LOAD DATA LOCAL INFILE语句时，要设置local-infile=0选项启动MySQL的守护进程。
+	3.11、mysqlimport
+		语法如下：
+			mysqlimport [options] database textfile1[textfile2 ... textfileN]
+
+		一些mysqlimport选项：
+			-c:当目标文件中字段的数量或者顺序与表不匹配时，应当使用此选项。
+			-C:假设双方都支持压缩，此选项将在客户端和服务器之间压缩数据流。如果要加载的目标文件个数据库不在相同的服务器上，该选项最为有效。
+			-#：此选项用于在调试时创建跟踪文件。
+			-d:此选项在导入目标文件的数据之前删除目标表中的内容。
+			-f:此选项包括mysqlimport,即使在发生错误的时候也要继续执行。
+			-h:连接服务器主机地址。
+			-i：忽略目标文件中与表中已有记录有相同主键或唯一键的记录。
+			-L：此选项指定目标文件位于客户端，默认情况下，认为此文件位于数据库服务器中。因此，如果远程执行次命令，而且没有文件上传到数据库，则需要包含此选项。
+			-P:如果目标MySQL服务器运行在非标准端口，则需要用此选项来指定该端口。
+			-r：覆盖表中有相同主键或者唯一键的已有记录。
+			-s：只输出错误信息。
+			-S：如果在启动mysql服务器时声明了非默认的socket文件，则应当包括此选项。
+			-v：输出大量关于其行为可能有用的信息。
+			-V：输出并退出版本信息。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
