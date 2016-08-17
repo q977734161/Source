@@ -1,0 +1,248 @@
+
+
+<?php 
+
+/**
+*	插入排序
+*
+*
+**/
+
+function print_arr(array $a, $i)
+{
+	echo $i.":";
+	$len = count($a);
+	for ($j=0;$j<$len;$j++)
+	{
+		echo $a[$j]." ";
+	}
+	echo "\n";
+}
+
+function InsertSort(array &$a)
+{
+	$len = count($a);
+	for ($i=1;$i<$len;$i++)
+	{
+		if($a[$i] < $a[$i-1])
+		{
+			$j=$i-1;
+			$x=$a[$i];
+			$a[$i]=$a[$i-1];
+			while ($j >= 0 && $x < $a[$j])
+			{
+				$a[$j+1]=$a[$j];
+				$j--;
+			}
+			$a[$j+1]=$x;
+		}
+		print_arr($a, $i);
+	}
+}
+
+$a = array(
+		3,1,5,7,2,4,9,6
+);
+InsertSort($a);
+print_arr($a, 8);
+
+?>
+
+
+
+<?php 
+
+/**
+*	希尔排序
+*
+*
+**/
+function print_arr(array $a, $i)
+{
+	echo $i.":";
+	$len = count($a);
+	for ($j=0;$j<$len;$j++)
+	{
+		echo $a[$j]." ";
+	}
+	echo "\n";
+}
+
+ 
+function ShellInsertSort(array &$a,$dk)
+{
+	$len = count($a);
+	for($i= $dk; $i<$len; ++$i){
+		if($a[$i] < $a[$i-$dk]){			//若第i个元素大于i-1元素，直接插入。小于的话，移动有序表后插入
+			$j = $i-$dk;	
+			$x = $a[$i];			//复制为哨兵，即存储待排序元素
+			$a[$i] = $a[$i-$dk];			//首先后移一个元素
+			while($j >=0 && $x < $a[$j]){		//查找在有序表的插入位置
+				$a[$j+$dk] = $a[$j];
+				$j -= $dk;			 //元素后移
+			}
+			$a[$j+$dk] = $x;			//插入到正确位置
+		}
+		print_arr($a, $i );
+	}
+	
+}
+ 
+function shellSort(array &$a){
+ 	
+	$len = count($a);
+	$dk = $len/2;
+	while( $dk >= 1  ){
+		ShellInsertSort($a, $dk);
+		$dk = $dk/2;
+	}
+}
+
+$a = array(
+		3,1,5,7,2,4,9,6
+);
+shellSort($a);
+print_arr($a, 8);
+
+?>
+
+<?php 
+
+/**
+* 简单的选择排序
+**/
+
+function print_arr(array $a, $i)
+{
+	echo $i.":";
+	$len = count($a);
+	for ($j=0;$j<$len;$j++)
+	{
+		echo $a[$j]." ";
+	}
+	echo "\n";
+}
+function selectMinKey(array $a,$i)
+{
+	$len = count($a);
+	$k = $i;
+	for ($j=$k;$j<$len;$j++)
+	{
+		if($a[$k] > $a[$j])
+			$k = $j;
+	}
+	return $k;
+}
+
+function selectSort(array &$a)
+{
+	$key=0;
+	$tmp=0;
+	foreach ($a as $index=>$val){
+		$key = selectMinKey($a, $index);
+		if($key!==$index){
+			$tmp = $a[$index];
+			$a[$index] = $a[$key];
+			$a[$key] = $tmp;
+		}
+		print_arr($a, $index);
+	}
+	
+}
+
+$a = array(
+		3,1,5,7,2,4,9,6
+);
+selectSort($a);
+print_arr($a, 8);
+
+?>
+
+
+<?php 
+
+/**
+*	冒泡排序
+*
+*
+**/
+function print_arr(array $a, $i)
+{
+	echo $i.":";
+	$len = count($a);
+	for ($j=0;$j<$len;$j++)
+	{
+		echo $a[$j]." ";
+	}
+	echo "\n";
+}
+function bubbleSort(array &$a)
+{
+	$len = count($a);
+	foreach ($a as $key => $value)
+	{
+		for($i=$key;$i<$len;$i++)
+		{
+			if($i-1 >= 0 && $a[$i-1] > $a[$i])
+			{
+				$tmp = $a[$i-1];
+				$a[$i-1] = $a[$i];
+				$a[$i] = $tmp;
+			}
+			print_arr($a, $i);
+		}
+		
+	}
+	
+}
+
+function bubbleSort_1 (array &$a) {
+	$len = count($a);
+	$i= $len -1;  //初始时,最后位置保持不变
+	while ( $i> 0) {
+		$pos= 0; //每趟开始时,无记录交换
+		for ($j= 0; $j< $i; $j++){
+			if ($a[$j]> $a[$j+1]) {
+				$pos= $j; //记录交换的位置
+				$tmp = $a[$j]; 
+				$a[$j]=$a[$j+1];
+				$a[$j+1]=$tmp;
+			}
+		}
+		$i= $pos; //为下一趟排序作准备
+	}
+}
+
+
+function bubbleSort_2(array &$a){
+	$len = count($a);
+	$low = 0;
+	$high= $len -1; //设置变量的初始值
+	while ($low < $high) {
+		for ($j= $low; $j< $high; ++$j) //正向冒泡,找到最大者
+			if ($a[$j]> $a[$j+1]) {
+				$tmp = $a[$j]; 
+				$a[$j]=$a[$j+1];
+				$a[$j+1]=$tmp;
+			}
+		--$high;					//修改high值, 前移一位
+		for ( $j=$high; $j>$low; --$j) //反向冒泡,找到最小者
+			if ($a[$j]<$a[$j-1]) {
+				$tmp = $a[$j]; 
+				$a[$j]=$a[$j-1];
+				$a[$j-1]=$tmp;
+			}
+		++$low;					//修改low值,后移一位
+	}
+}
+
+
+$a = array(
+		3,1,5,7,2,4,9,6
+);
+//bubbleSort($a);
+//bubbleSort_1($a);
+bubbleSort_2($a);
+print_arr($a, 8);
+
+?>
