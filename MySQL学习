@@ -306,8 +306,137 @@ MySql学习
 			 	SET AUTOCOMMIT=0;//关闭自动提交模式
 			 	SET AUTOCOMMIT=1;//开启自动提交模式
 	5.外键与数据的完整性
-		
-		
+		声明外键的语法如下：
+			FOREIGN KEY('index_name')
+			PEFERENCES 'tbl_name' ('index_columns')
+			[ON DELETE ACTION]
+			[ON UPDATE ACTION]
+			各自段说明：
+				*：index_name为子表的外键字段名，tbl_name为父表名称，index_columns为外键所关联的父表字段。
+				*：ON DELETE用来说明当父记录被删除时，子表怎样变化。它分为以下几种情况：
+					1.ON DELETE CASCADE:当父记录被删除时，与之关联的子表记录也会被删除，也就是级联删除；当多个表关联时，我们只须删除一个父表，剩下的级联删除操作InnoDB会为我们自动完成。
+					2.ON DELETE NULL:当父记录被删除时，子表中与之匹配的外键将会被设置为NULL(注意，当这个外键字段允许为NULL值时，它也不能置为主键，因为主键是不能为NULL的)
+					3.ON DELETE NO ACTION:指定如果试图删除某一行，而该行的键被其他表中的外键所引用，则会产生一个错误并回滚DELETE语句。
+				*：ON UPDATE用来说明当父记录被更新时，子表怎样变化。它分为以下几种情况：
+					1.ON UPDATE CASCADE:当父表被关联键值更改时，与之关联的子表外键也会被更改。
+					2.ON UPDATE NULL:当父表某行被更改时，子表中与之匹配的外键将被设置为NULL.
+					3.ON UPDATE NO ACTION:当父表被关联键值更改时，若子表中有外键与之关联，则产生一个错误并回滚UPDATE语句。
+				在定义外键时需要注意两点：
+					*：构成外键关系的父表列与子表列都必须被索引的，否则不可以创建外键。
+					*：父表索引与子表索引相对应的数据列的类型必须是兼容的。
+	6.数据库内部语句和语法
+		6.1、ALTER DATABASE语法
+			ALTER {DATABASE | SCHMA} {db_name}
+				alter_specification[,alter_specification]...
+
+			alter_specification:
+				[DEFAULT] CHARACTER SET charset_name
+				|[DEFAULT] COLLATE 	collation_name
+
+			ALTER DATABASE用于更改数据库的全局特性，这些特性存储在数据库目录的db.opt文件中。要使用ALTER DATABASE，需要获得数据库的ALTER权限。CHARACTER SET用于更改默认数据库的字符集，COLLATE用于更改数据库默认的校对规则。
+			例如：
+				ALTER DATABASE 'shop' CHARACTER SET utf8 COLLATE utf8_genneral_ci;
+		6.2、ALTER TABLE语法
+			ALTER [IGNONE] TABLE tbl_name
+				alter_specification [,alter_specification]
+
+			alter_specification:
+				ADD [COLUMN] column_definition [FIRST | ATLER col_name]
+				| ADD [COLUMN] (column_definition,...)
+				| ADD INDEX [index_name] [index_type] (index_col_name,...)
+				| ADD [CONSTRAINT [symbol]] PRIMERY KEY [index_type](index_col_name,...)
+				| ADD [CONSTRAINT [symbol]] UNIQUE [index_name] [index_type](index_col_name,...)
+				| ADD [FULLTEXT|SPATIAL][index_name](index_col_name,...)
+				| ADD [CONSTRAINT [symbol]] FOREIGN KEY [index_key](index_col_name,...)[refrence_definition]
+				| ADD [COLUMN] col_name {SET DEFAULT literal | DROP DEFAULT}
+				| CHANGE [COLUMN] old_col_name column_definition
+				[FIRST|AFTER] col_name
+				| MODIFY [COLUMN] column_definition [FIRST | AFTER col_name]
+				| DROP [COLUMN] col_name
+				| DROP PRIMARY KEY
+				| DROP INDEX index_name
+				| DROP FOREIGN KEY fk_symbol
+				| DISABLE KEYS
+				| ENABLE KEYS
+				| RENAME [TO] new_tbl_name
+				| ORDER BY col_name
+				| CONVERT TO CHARACTER SET charset_name [COLLATE collation_name]
+				| [DEFAULT] CHARACTER SET charset_name [COLLATE collation_name】
+				| DISCARD TABLESPACE
+				| IMPORT TABLESPACE
+				| table_options
+				| partition_options
+				| ADD PARTITION partition_definition
+				| DROP PARTITION partition_names
+				| COALESCE PARTITION number
+				| REORGANIZE PARTITION partition_names INTO (partition_definitions)
+				| ANALYZE PARTITION partition_names
+				| CHECK PARTITION partition_names
+				| OPTIMIZE PARTITION partition_names
+				| REBUILD PARTITION partition一names
+				| REPAIR PARTITION partition_names				
+			ALERT TABLE用于更改表的结构。
+			几种常见的操作：
+				（1）、添加列
+					ALTER TABLE ADD [COLUMN] column_definition
+
+					alter table 'product' add column 'price' int default '0' null after 'count';
+				(2)、增加索引
+					ALTER TABLE ADD[INDEX | PRIMARY KEY | FULLTEXT ][index_name][index_type](index_col_name,...)
+
+					ALTER TABLE 'product' ADD INDEX 'p_count_key' ('count');
+				（3）、增加外键
+					ALTER TABLE ADD FOREIGN KEY [index_name](index_col_name,...)
+					只有InnoDB支持外键
+				（4）、更改表信息
+					CHANGE olc_col_name column_definition
+
+					对列进行重命名
+					ALTER TABLE 'product' CHANGE price new_price INTEGER NOT NULL;
+
+					只修改列类型：
+					ALTER TABLE 'product' CHANGE price price BGIINT NOT NULL;
+
+					当使用MODIFY来改变列的类型的时候补血药重命名：
+					ALTER TABLE 'product' MODIFY price BIGINT NOT NULL;
+				(5)、停止更新、重新创建索引
+					ALTER TABKE ... DISABLE KEYS首先让MySQL停止更新表中的非唯一索引，然后使用ALTER TABLE ... ENABLE KEYS 重新创建丢失的索引，在进行大批量数据插入操作前建议先禁用索引，插入完后在更新索引，这样可以加快执行速度。
+				（7）、分区
+					ALTER TABLE即可以用来对带分区的表进行重新分区（包括添加、取消、合并和拆分各分区），也可以用来对分区进行维护。
+					对带分区的表使用partion_options子句和ALTER TABLE可以对表进行重新分区，假设有一个按照以下方式创建的带分区的表，代码如下：
+						CREATE TABLE t1(
+						id INT,
+						year_col int
+						)
+						PARTITION BY RANGE(year_col)
+						(
+							PARTITION p0 VALUES LESS THAN (1991),
+							PARTITION p1 VALUES LESS THAN (1995),
+							PARTITION p2 VALUES LESS THAN (1999),
+						);
+						可以在表中增加一个新的分区片p3,该分区用于存储小于2002的值，添加方法如下：
+							ALTER TABLE t1 ADD PARTITION p3 VALUES LESS THAN (2002);
+
+						DROP PARTITION用于取消一个或者多个RANGE或LIST分区。DROP PATITION命令不能用于HASH或KEY分区，当用于这两个分区时，应使用COALESCE PARTITION.如果被取消的分区其名称列于patition_names清单中，则存储在此分区中的数据也会被取消。例如，如果一定义了表t1，则可能采用如下方法取消名称为p0和p1的分区：
+							ALTER TABLE DROP PARTITION p0,p1;
+						ADD PARTITION和DROP PATITION目前不支持IF [NOT] EXISTS,它们也不可能对一个分区或一个一份去的表进行重命名。如果希望对一个分区进行重命名，则必须先取消分区在重新建立分区；如果希望对一个以分区的表进行重新命名，也必须取消所有分区，然后对表进行重命名，在添加被取消的分区。
+
+						COALESCE PARTITION可以用于使用HASH或KEY分区的表，一边使用number来减少分区的数目。例如，假设使用下列方法创建了表t2:
+							CREATE TABLE T2(
+								name VARCHAR(20),
+								started DATE
+							)	
+							PARTITION BY HASH(YEAR(started))
+							PARTITIONS(6);
+						可以使用以下命令把t2使用的分区数目有6个减少到4个：
+							ALTER TABLE t2 COALESCE PATITION 2;
+						包含在最后一个number分区中的数据将会被合并到其余的分区中。在此情况下，分区4和分区5将被合并到前4个分区中。
+
+						如果要更改部分分区，但不更改所有的分区，可以使用REORGANIZE PARTITION。这个命令有多种使用方法:
+							*:把多个分区合并为一个分区，通过把多个分区的名称列入partition_names清单，并为partition_definition提供一个单一的定义，可以实现这个功能。
+							*：把一个原有的分区拆分为多个分区，通过partition_names命名一个分区，并提供多个partition_definitions,可以实现这个功能。
+							*：要改使用VALUES LESS THAN定义的分区子集的范围或更改VALUES IN定义的分区子集。
+							*：对于没有明确命名的分区，MySQL会自动提供默认名称p0,p1,p2等
 
 
 
