@@ -430,21 +430,176 @@ MySql学习
 							PARTITIONS(6);
 						可以使用以下命令把t2使用的分区数目有6个减少到4个：
 							ALTER TABLE t2 COALESCE PATITION 2;
-						包含在最后一个number分区中的数据将会被合并到其余的分区中。在此情况下，分区4和分区5将被合并到前4个分区中。
+						包含在最后一个number分区中的数据将被合并到其余的分区中。在此情况下，分区4和分区5将被合并到前4个分区中(编号为0、1、2和3的分区）。
+						如果要更改部分分区，但不更改所有的分区，可以使用REORGANIZE PARTITION。这个命令有多种使用方法：
+						□把多个分区合并为一个分区。通过把多个分区的名称列入partition_names清单，并为
+						partition_definition提供一个单一的定义，可以实现这个功能。
+						□把一个原有的分区拆分为多个分区。通过为partition_names命名一个分区，并提供多
+						个partition_definitions，可以实现这个功能。
+						□更改使用VALUES LESS THAN定义的分区子集的范围或更改VALUES IN定义的分区
+						子集。
+						□对于没有明确命名的分区，MySQL会自动提供默认名称p0、pi、p2等
+		6.3、CREATE DATABASE语法
+			CREATE{DATABASE | SCHEMA } [IF NOT EXISTS] db_name 
+				[create_specification[,create_specification]...]
 
-						如果要更改部分分区，但不更改所有的分区，可以使用REORGANIZE PARTITION。这个命令有多种使用方法:
-							*:把多个分区合并为一个分区，通过把多个分区的名称列入partition_names清单，并为partition_definition提供一个单一的定义，可以实现这个功能。
-							*：把一个原有的分区拆分为多个分区，通过partition_names命名一个分区，并提供多个partition_definitions,可以实现这个功能。
-							*：要改使用VALUES LESS THAN定义的分区子集的范围或更改VALUES IN定义的分区子集。
-							*：对于没有明确命名的分区，MySQL会自动提供默认名称p0,p1,p2等
+			create_specification:
+				[DEFAULT] CHARACTER SET charset_name
+				|[DEFAULT] COLLATE collation_name
 
+		6.4、CREATE INDEX语法
+			CREATE INDEX命令用于向表中添加索引，语法如下：
+				CREATE [UNIQUE | FULLTEXT|SPATIAL] INDEX index_name
+					[USING index_type]
+					ON tbl_name (index_col_name,...)
+				index_col_name:
+					col_name [(length)] [ASC|DESC]
+			创建一个多列索引时，各列名称以逗号隔开即可。
+			CHAR和VARCHAR列可以全部或者只用列的一部分来创建索引。创建索引时使用col_name(length)语法只对指定长度的前缀进行索引，这样可以减少索引文件的大小，节省磁盘空间，并能提高insert与delete的索引速度。
+				BLOB,TEXT列也可以编制索引，单必须指定前缀长度。
+				例如：
+					CREATE INDEX index_p_name ON product (p_name(10));
+			FULLTEXT索引只能对CHAR，VARCHAR和TEXT列创建索引，并且只能针对MyISAM表。
+		6.5、CREATE TABLE语法
+			CREATE [TEMPORARY] TABLE [IF NOT EXISTS] tbl_name
+				[(create_definition,...)]
+				[table_options] [select_statement]
 
+			或
+			CREATE [TEMPORARY] TABLE [IF NOT EXISTS] tbl_name
+				[(] LIKE old_tbl_name [)];
 
+			￼create_definition:
+			 	column_definition
+				|[CONSTRAINT [symbol]] PRIMARY KEY [index_type] (index_col_name, ...) 
+				| KEY [index_name] [index_type] (index_col_name,..)
+				| INDEX [index_name] [index_type] (index_col_name,...)
+				| [CONSTRAINT [symbol]] UNIQUE [INDEX]
+					[index_name] [index_type] (index_col_name,...)
+				| [FULLTEXT|SPATIAL] [INDEX] [index_name] (index_col_name,...)
+				| [CONSTRAINT [symbol]] FOREIGN KEY
+					[index_name] (index_col_name,...) [reference_definition]
+				| CHECK (expr)
+				
+			column_definition:
+				col_name type [NOT NULL | NULL] [DEFAULT default_valueJ
+				[AUTO_INCREMENT] [UNIQUE [KEY] | [PRIMARY] KEY] 
+				[COMMENT 'string'] [reference_definition]
 
+			￼type:
+				TINYINT[(length)) [UNSIGNED] [ZEROFILL]
+				| SMALLINT[(length)] [UNSIGNED] [ZEROFILL] 
+				| MEDIUMINT[(length)] [UNSIGNED] [ZEROFILL] 
+				| INT[(length)] [UNSIGNED] [ZEROFILLJ
+				| INTEGER!(length)] [UNSIGNED] [ZEROFILL]
+				| BIGINTl(length)] [UNSIGNED] [ZEROFILL]
+				| REAL [(length,decimals)] [UNSIGNED] [ZEROFILLJ
+				| DOUBLE[(length,decimals >] [UNSIGNED] [ZEROFILL] 
+				| FLOAT[(length,decimals> [UNSIGNED] [ZEROFILL] 
+				| DECIMAL(length,decimals) [UNSIGNED] [ZEROFILL]
+				| NUMERIC(length,decimals > [UNSIGNED] [ZEROFILL] 
+				| DATE
+				| TIME
+				| TIMESTAMP
+				| DATETIME
+				| CHAR(length) 【BINARY | ASCII | UNICODE]
+				| VARCHAR(length) (BINARY]
+				| TINYBLOB
+				| BLOB
+				| MEDIUMBLOB
+				| LONGBLOB
+				| TINYTEXT [BINARY]
+				| TEXT [BINARY]
+				| MEDIUMTEXT [BINARY]
+				| LONGTEXT [BINARY]
+				| ENUM(valuel,value2,value3,...)
+				| SET{valuel1,value2,value3,...)
+				| spatial_type
+			index_col_name:
+				col_name [(length)] [ASC | DESC]
+			
+			reference_definition:
+				REFERENCES tbl_name [(index_col一name,...]
+					[MATCH FULL | MATCH PARTIAL | MATCH SIMPLE]
+					[ON DELETE reference_option] 
+					[ON UPDATE reference_option]
+			reference_option:
+				RESTRICT | CASCADE | SET NULL | NO ACTION
+			
+			table_options: table_option [table_option] ...
 
+			table_option:
+					{ENGINE|TYPE} = engine_name
+				| AUTO_INCREMENT = value 
+				| AVG_ROW_LENGTH = value
+				| [DEFAULT] CHARACTER SET charset_name [COLLATE collation_name] 
+				| CHECKSUM = {0 | 1}
+				| COMMENT = 'string'
+				| CONNECTION = 'connec_string'
+				| MAX_ROWS = value
+				| MIN_ROWS = value
+				| PACK_KEYS = {0 | 1 | DEFAULT}
+				| PASSWORD = 'string'
+				| DELAY_KEY_WRITE = {0 | 1}
+				| ROW_FORMAT = {DEFAULT|DYNAMIC|FIXED|COMPRESSED|REDUNDAN|COMPACT} 
+				| UNION = (tbl_name[,tbl_name]...)
+				| INSERT_METHOD = { NO | FIRST 丨 LAST }
+				| DATA DIRECTORY = 'absolute path to directory'
+				| INDEX DIRECTORY = 'absolute path to directory'
 
+			￼partition—options: 
+				PARTITION BY
+					[LINEAR] HASH(expr)
+					| [LINEAR] KEY(column_list> 
+					| RANGE(expr) 
+					| LIST(column—list)
+				[PARTITIONS num]
+				[ SUBPARTITION BY
+					  [LINEAR] HASH(expr)
+					| [LINEAR] KEY(column_list)
+					[SUBPARTITIONS(num)]
+					]
+					[(partition_definition) ,[(partition_definition)],...]
+			partition_definition:
+				PARTITION partition_name
+					[VALUES {
+							LESS THAN (expr) | MAXVALUE 
+							| IN (value_list) }]
+					[[STORAGE] ENGINE [=] engine-name]
+					[COMMENT [=] 'comment_text']
+					[DATA DIRECTORY [=] 'data_dir']
+					[INDEX DIRECTORY [= 'index_dir']
+					[MAX_ROWS [=] max_number_of_rows] 
+					[MIN_ROWS [=] min_number_of_rows]
+					[TABLESPACE [=] (tablespace_name)] 
+					[NODEGROUP [=] node_group_id] 
+					[(subpartition_definition) , [(subpartition_definition)],...]
+			￼subpartition_definition: 
+				SUBPARTITION logical_name
+					[[STORAGE] ENGINE [=] engine-name] 
+					[COMMENT [=] 'comment_text'] 
+					[DATA DIRECTORY [=] 'data_dir']
+					[INDEX DIRECTORY [=] 'index_dir'] 
+					[MAX_ROWS [=] max_number_of_rows] 
+					[MIN_ROWS [=] min_number_of_rows]
+					[TABLESPACE [=] (tablespace_name)]
+					[NODEGROUP [=] node_group_id]
+			select—statement:
+					[IGNORE | REPLACE】 [AS] SELECT ... (Some legal select statement)
 
+			当创建表个时候，可以使用TEMPOPARY临时表。只有在当前连接的情况下，TEMPOPARY表才是可用的，但是不可见。当链接关闭时，TEMPOPARY表被自动取消，
 
+			每个表都可以创建一个AUTO_INCREMENT自增列，当插入一个NULL值或0时，该列会自动加1且该列必须被定义一种整数类型。可以设置--sql-mode服务器选项或吧sql-mode系统变量指定为NO_AUTO_VALUE_ON_ZERO(即执行SET SQL_MODE='NO_AUTO_VALUE_ON_ZERO')，这样就可以把0存储到AUTO_INCREMENT列中，同事不会生成一个新的序列值。
+
+			DEFAULT字句用于为列指定一个默认值。默认值必须为一个常数，不能为函数或表达式。但是有一种情况例外，可以对TIMESTAMP列指定CURRENT_TIMESTAMP为默认值。注意，MySQL日期列的默认值不能被设置为函数，如NOW()或CURRENT_DATE.BLOB和TEXT列不能被赋予默认值。
+
+			PRIMARY KEY是一个唯一的KEY，一个表最多有一个PRIMARY KEY。
+
+			可以使用SHOW INDEX FROM talbe查看表的索引情况。
+
+			*：AUTO_INCREMENT:可以用ALTER TABLE tbl_name AUTO_INCREMENT = N来重新设置AUTO_INCREMENT的值。
+
+			*：CHARACTER SET:用
 
 
 
