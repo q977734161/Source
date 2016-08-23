@@ -599,7 +599,251 @@ MySql学习
 
 			*：AUTO_INCREMENT:可以用ALTER TABLE tbl_name AUTO_INCREMENT = N来重新设置AUTO_INCREMENT的值。
 
-			*：CHARACTER SET:用
+			*：CHARACTER SET:用于为表指定一个默认的字符集。CHARSET与CHARACTER SET同义.
+
+			*：COLLATE：用于为表指定一个默认的校验规则.
+
+			*：CHECHSUM：如果希望MySQL随时对所有行进行实时校验求和，则应该把此项设置为1.这样做，表的更新速度会略慢些，但是更容易找到受损的表。CHECKSUM TABLE语句用于报告校验求和（仅限于MyISAM）.
+
+			*：COMMIT:用于表的注释，最长60个字符。
+
+			*：MAX_ROWS:用于储存表中的行数目的最大值。这不是一个硬性限制，而更像一个指示语句，指示出表必须能存储至少这么多行。
+
+			*：MIN_ROWS:用于存储表中的行数目的最小值。
+
+			*：PACK_KEYS:如果希望索引更小，则把此选项设置为1，这样做通常会是更新速度变慢，同时阅读速度加快。设置为0，取消所有关键字压缩。把此选项设置为DEFALT时，存储引擎只压缩长的CHAR和VARCHAR列。
+
+			*:DELAY_KEY_WRITE:如果要延迟对关键字的更新，乳等到表关闭的后在更新，则把此项设置为1，如果想复制现有表中的结构与数据创建一个新表，则可以执行CREATE TABLE ... SELECT语句：
+				CREATE TABLE new_table SELECT * FROM table;
+			注意，该语句不会自动创建任何索引，如果希望为一创建的表建立索引，则应在SELECT语句前指定索引，语法如下：
+				CREATE TABLE new_table (PRIMARY KEY ('ID')) SELECT * FROM table;
+
+			也可以明确的为一个已生成的列指定类型，语法如下：
+				CREATE TABLE newtable (A TINYINT NOT NULL) SELECT p_count+1 as a FROM table;
+			要想复制原表中定义的所有列属性和索引，可以用LIKE创建一个空表，语法如下：
+				CREATE TABLE new_table LIKE table;
+	6.6 RENAME TABLE语法
+		RENAME TABLE tb1_name to new_tb1_name
+			[,tb1_name2 TO new_tb1_names] ...
+
+7、数据库操作语句和语法
+	7.1、DELETE 语法
+		单表删除语法：
+			DELETE [LOW_PRIORITY] [QUICK] [IGNORE] FROM tbl_name
+				[WHERE where_definition]
+				[ORDER BY ...]
+				[LIMIT row_count]
+		多表删除语法：
+			DELETE [LOW_PRIORITY] [QUICK] [IGNORE]  tbl_name[.*][,tbl_name[.*] ...] 
+			FROM table_references
+				[WHERE where_definition]
+	7.2、DO语法
+		DO expr [,expr]...
+
+		DO用于执行表达式，但不返回任何结果。DO是SELECT expr的简化表达方式，不返回结果，速度较快。
+	7.3、HANDLER语法
+		HANDLER tbl_name OPEN [AS alias]
+		HANDLER  tbl_name READ index_name { = | >= | <= | <} (value1,value2,...)
+			[WHERE where_condition][LIMIT ...]
+		HANDLER  tbl_name READ index_name { FIRST | NEXT | PREV | LAST} 
+			[WHERE where_condition][LIMIT ...]
+		HANDLER  tbl_name READ { FIRST | NEXT } (value1,value2,...)
+			[WHERE where_condition][LIMIT ...]
+
+		HANDLER tbl_name CLOSE
+
+		HANDLER语句提供了通往表存储引擎接口的直接通道，可用于MyISAM和InnoDB表。HANDLER...OPEN语句用于打开一个表，通过HANDLER...READ语句建立读取表的通道，且不会被其他线程共享，也不会关闭，直到线程调用HANDLER...CLOSE或线程中止时为止。如果使用一个别名打开表，则使用其他HANDLER语句时必须使用次别名，而不能使用表名。
+			使用HANDLER语法打开与关闭产品表的语法如下：
+
+			HANDLER nc_product OPEN;
+
+			HANDLER nc_product CLOSE;
+
+			使用别名打开：
+			HANDLER nc_product OPEN as V;
+
+			HANDLER V CLOSE;
+
+		如果被指定的索引满足给定的值并且符合WHERE条件，在没有LIMIT时，HANDLER ...READ只取出一行。例如取出价格大于1200元的商品，由于没有使用LIMIT，因此他只取得符合条件的一行结果，代码如下：
+			HANDLER nc_product READ index_p_price > (1200);
+
+			'index_p_price'是p_price列的索引名称，此处不可以写成p_price>1200.
+
+			如果加上WHERE条件，取出商品价格高于1200元的并且库存少于10的前4条信息你，代码如下：
+
+			HANDLER nc_product READ index_p_price > (1200)
+			where p_price < 10 limit 4;
+
+			如果使用PRIMERY KEY为条件时，应使用带引号的标识符'PRIMARY',大妈如下
+
+			HANDLER tbl_name READ 'PRIMARY' > (...);
+	7.4、INSERT语法
+		INSERT [LOW_PRIORITY | DELAYED | HIGH_PRIORITY ] [INGORE]
+			[INTO] tbl_name [(col_name,...)]
+			VALUES ({expr | DEFAULT},...),(...),...
+			[ON DUPLICATE KEY UPDATE col_name=expr,...]
+
+			或
+
+			INSERT [LOW_PRIORITY | DELAYED | HIGH_PRIORITY ] [INGORE]
+				[INTO] tbl_name
+				SET col_name={expr | DEFAULT},...
+				[ON DUPLICATE KEY UPDATE col_name=expr,...]
+			或
+			INSERT [LOW_PRIORITY | DELAYED | HIGH_PRIORITY ] [INGORE]
+				[INTO] tbl_name [(col_name,...)]
+				SELECT ...
+				[ON DUPLICATE KEY UPDATE col_name=expr,...]
+		INSERT命令有三种形式。分别是：
+			*：INSERT INTO 表名（字段名，字段名）VALUES(值，值)
+			*：INSERT INTO 表名 SET 字段名=值
+			*：INSERT INTO 表名 SELECT ...
+
+		INSERT用于向一个已有的表中插入新行
+			*：IGNORE关键词用于在执行INSERT时把出现的错误当成警告来处理。
+			*：ON DUPLICATE KEY UPDATE用于批量插入与更新。如果要插入的UNIQUE索引或者PRIMARY KEY值已存在，则进行UPFATE更新操作，如果不存在，则执行INSERT插入操作。
+
+	7.5、LOAD DATA INFILE语法
+		*：各列以TAB分割，各行以换行分隔，数值的顺序与导入表中的顺序一致。
+		*：LOCAL关键字表示该命令会从本地读取文件，并将文件上传到服务器，如果没有LOCAL,命令将会从服务器读取该文件。
+		语法如下：
+			LOAD DATA [LOW_PRIORYTY | CONCURRENT ][LOCAL] INFILE 'file_name.txt' 
+			[REPLACE | IGONRE]
+			INTO TABLE tbl_name
+			[FIELDS
+				[TERMINATED BY 'string']
+				[[OPTIONALLY] ENCLOSED BY 'char']
+				[ESCAPED BY 'char']
+			]
+			[
+				LINES
+					[STARTING BY 'string']
+					[TERMINATED BY 'string']
+			]
+			[IGNORE number LINES]
+			[(col_name_or_user_var,...)]
+			[SET col_name = expr,...]
+
+	7.6、FIELDS分隔符
+		*:TERMINATED BY 为字段分隔符，默认是tab（\t）;
+		*:ENCLOSED BY 字段括起字符。
+		*：ESCAPED BY 转义字符，默认的是反斜杠（\）;
+		*:LINES关键字指定了每行记录的分隔符，默认为'\n'是换行符；
+		*：LOAD DATA INFILE 默认的导入规则如下：
+			a. 在新行处寻找行的边界。
+			b. 不会跳过任何行的前缀。
+			c. 在制表符处把行分解为字段。
+			d. 不希望字段被包含在任何引号字符之中。
+			e. 出现制表符、新行或者在'\'前有'\'时，则作为字段值的一部分的文字字符。
+		*：与之相反，SELECT ... INTO OUTFILE默认导入规则如下：
+			a. 把字段之间写入制表符。
+			b. 不把字段包含在任何引号字符中。
+			c. 当字段中出现制表符、新行或'\'时，则是用'\'进行转义。
+			d. 在行的末尾插入新行。
+	7.7、REPLACE语法
+		REPLACE的语法规则如下：
+
+		REPLACE [LOW_PRIORITY | DELAYED]
+			[INTO] tbl_name [(col_name,...)]
+			VLAUES ({EXPR | DEFUAL},...),(...),...
+		或
+		REPLACE [LOW_PRIORITY | DELAYED]
+			[INTO] tbl_name
+			SET col_name={expr | DEFAULT},...
+		或
+		REPLACE [LOW_PRIORITY | DELAYED]
+			[INTO] tbl_name [(col_name,...)]
+			SELECT ...
+		RELACE的运行与INSERT很相像。只有一点除外，如果表中的一个旧记录与一个用于PRIMARY KEY或者UNIQUE的索引的新纪录具有相同的值，则在新纪录被插入之前，就记录会被删除。注意，除非表中有一个PRIMARY KEY或UNIQUE索引，否则使用一个REPLACE语句是没有意义的。
+	7.8、SELECT语法
+	7.9、TRUNCATE语法
+	7.10、UPDATE语法
+		UPDATE [LOW_PRIORATY][IGNORE] tbl_name
+		SET col_name1=axpr1[,col_name2=axpr2 ...]
+		[WHERE where_definition]
+		[ORDER BY ...]
+		[LIMIT row_count]
+	7.11、EXPLAIN语法
+		EXPLAIN tbl_name;
+
+		或者
+		EXPLAIN SELECT select_options
+
+		EXLPAIN tbl_name 语句和DESCRIBE tbl_name语句意义相同，用于显示表结构信息。EXPLAIN SELECT select_options用来取得SELECT语句的相关信息。MYSQL会解释如何运行该SELECT语句，显示的结果包括如何连接、连接的顺序、使用索引等信息。从而优化SQL提供参考。下面展示各种信息的解释：
+			*：ID：MySQL查询的序列号；
+			*：Select_type:所使用的查询类型，主要有以下几种：
+				1）、DEPENDENT SUBQUERY:子查询内层的第一个SELECT,依赖于外部查询的结果集。
+				2）、DEPENDENT UNION:子查询中的UNION,	且为UNION中从第二个SELECT开始的后面所有的SELECT，同样依赖于外部查询的结果集。
+				3）、PRIMARY:子查询的最外层查询，注意并不是主键查询。
+				4）、SIMPLE:除子查询或UNION查询之外的查询；
+				5）、SUBQUERY:子查询内层查询的第一个SELECT,结果不依赖于外部查询结果集。
+				6）、UNCACHEABLE SUBQUERY:结果集无法缓存的子查询。
+				7）、UNION:UNION语句中第二个select开始后面的所有SELECT,第一个SELECT为PRIMARY.
+				8）、UNION RESULT:UNION中的合并结果。
+			*：Table:显示这一步缩放问的数据库中表的名称。
+			*：Type:告诉我们对表的访问方式，下面列出了几种常见的类型。
+				1）、system：系统表，表中只有一行数据。
+				2）、const：读常量，最多只会有一条匹配记录，由于是常量，所以实际上只须读一次。
+				3）、eq_ref:最多只会有一条匹配结果，一般是通过主键或者唯一索引来访问的。
+				4）、ref:表关联不是基于主键或唯一索引的查询。
+				5）、index_merge:查询中同时使用两个（或更多）索引，然后对索引结果进行合并，在读取表数据。
+				6）、index_subquery:子查询中的返回结果字段组合是一个索引（或索引组合），但不是一个主键或唯一索引。
+				7）、unique_subquery:子查询中的返回结果字段组合是主键或唯一约束。
+				8）、range:使用索引进行范围扫面；
+				9）、index:全索引扫面，只扫描索引树，比All块。
+				10）、all:全表扫描。
+			*：Possible_keys:该查询可以利用的索引。
+			*：Key:MySQL解释器实际使用的索引。
+			*：Key_len:被选中索引的索引键长度。
+			*：Ref:字段显示了哪些字段或常量被用来和key配合从表中查询记录。
+			*：Rows：显示MySQL认为他执行查询时必须检查的行数。
+			*：Extra:查询中每一步实现的额外细节信息：
+				1）、Using filesort:MySQL匹配完所有WHERE字句后，还需要额外进行拍训才可能得到结果，在这种情况下，一般建议优化以下SQL语句。
+				2）、Using temporary:MySQL需要穿讲一个临时表来容纳结果。如查询语句包含可以按不同情况列列出的GROUP BY和ORDER BY字句，在这种情况下，也建议优化SQL语句。
+
+	8.存储过程
+		8.1.创建存储过程
+			语法如下：
+				create procedure sp_name([proc_parameter[,...]])
+				begin
+					statement block
+				end
+
+			存储过程的参数一般由三个不分组成。第一部分in、out或者inout.in表示向存储过程中传入参数，out表示向存储过外传出参数；inout表示定义的参数不仅可以传入存储过程，还可以被存储过程修改后传出存储过程。默认为传入存储过程。第二部分为参数名，第三部分为参数的类型。
+
+			由于存储过程内部的语句要以分号结束，所以在定义存储过程前应将语句结束标志";"更改为其他字符，并且该字符在存储过程中出现的几率应该也比较第。可以用关键字delimiter来更改。
+
+		8.3、调用存储过程
+			call sp_name();
+
+		8.4、删除存储过程
+			drop procedure sp_name;
+
+		8.5、其他常用命令
+			1）、show procedure status;
+			2)、show create procedure sp_name;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
