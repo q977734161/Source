@@ -1,0 +1,51 @@
+洗牌算法
+
+1、Fisher_Yates算法 洗牌100万次的统计值，你会看到误差在6%以内
+void ShuffleArray_Fisher_Yates(char* arr, int len)
+{
+    int i = len, j;
+    char temp;
+ 
+    if ( i == 0 ) return;
+    while ( --i ) {
+        j = rand() % (i+1);
+        temp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = temp;
+    }
+}
+
+2、（10万次）效果更好一些，误差在2%以内
+void ShuffleArray_Manual(char* arr, int len)
+{
+    int mid = len / 2;
+ 
+    for (int n=0; n<5; n++){
+ 
+        //两手洗牌
+        for (int i=1; i<mid; i+=2){
+            char tmp = arr[i];
+            arr[i] = arr[mid+i];
+            arr[mid+i] = tmp;
+        }
+ 
+        //随机切牌
+        char *buf = (char*)malloc(sizeof(char)*len);
+ 
+        for(int j=0; j<5; j++) {
+            int start= rand() % (len-1) + 1;
+            int numCards= rand()% (len/2) + 1;
+ 
+            if (start + numCards > len ){
+                numCards = len - start;
+            }
+ 
+            memset(buf, 0, len);
+            strncpy(buf, arr, start);
+            strncpy(arr, arr+start, numCards);
+            strncpy(arr+numCards, buf, start);
+        }
+        free(buf);
+ 
+    }
+}
