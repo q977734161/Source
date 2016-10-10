@@ -1,0 +1,143 @@
+<?php
+Class Calendar{
+	private $_year;
+	private $_month;
+	private $_day;
+	private $_totaldays;
+	private $_weeks= array('日','一','二','三','四','五','六');
+	private $_date;
+	private $_firstDay;
+	
+	
+	public function __construct(){
+		$this->_year       = date("Y");
+		$this->_month      = date("m");
+		$this->_day        = date("d");
+		$this->_date 	   = mktime(0,0,0,$this->_month,1,$this->_year);
+		$this->_totaldays  = date("t",$this->_date);
+		$this->_firstDay   = date("w",$this->_date);
+	}
+	
+	public function setTime($year,$month,$day=1)
+	{
+		$this->_year       = $year;
+		$this->_month      = $month;
+		$this->_day        = $day;
+		
+	}
+	
+	private function _init()
+	{
+		$this->_date 	   = mktime(0,0,0,$this->_month,1,$this->_year);
+		$this->_totaldays  = date("t",$this->_date);
+		$this->_firstDay   = date("w",$this->_date);
+	}
+	
+	public function print()
+	{
+		self::_init();
+		
+		$count=0;
+		
+		$html = "<table class='calendertablecss'>";
+		$html .= "<tr><td colspan='7' style='text-align: center;'>{$this->_year}-{$this->_month}-{$this->_day}</td></tr>";
+		//echo "{$this->_year}-{$this->_month}-{$this->_day}\n";
+		
+		$html .= "<tr>";
+		for ($i=0;$i<7;$i++)
+		{
+			$html .= "<th>{$this->_weeks[$i]}</th>";
+			//echo "{$this->_weeks[$i]}\t";
+		}
+		$html .= "</tr>";
+		//echo "\n";
+		
+		$html .= "<tr>";
+		for($j=0;$j<$this->_firstDay;$j++)
+		{
+			$html .= "<td></td>";
+			//echo "\t";
+			$count ++;
+		}
+		
+		for($x=1;$x<=$this->_totaldays;$x++)
+		{
+			if(date("d")==$x && $this->_month==date("m") && $this->_year == date('Y')){
+				$html .= "<td style ='font-weight: bold; color: red;'>{$x}</td>";
+			}else{
+				$html .= "<td>{$x}</td>";
+			}
+			//echo "{$x}\t";
+			$count++;
+			if($count%7==0)
+			{
+				$html .= "</tr>";
+				$html .= "<tr>";
+				//echo "\n";
+			}
+		}
+		$html .= "</tr></table>";
+		
+		echo $html;
+	}
+	public function getPreMonth()
+	{
+		if($this->_month==1)
+		{
+			$this->_year--;
+			$this->_month = 12;
+		}
+		else{
+			$this->_month--;
+		}
+	}
+	public function getNextMonth()
+	{
+		if($this->_month==12)
+		{
+			$this->_year++;
+			$this->_month = 1;
+		}
+		else{
+			$this->_month++;
+		}
+	}
+	public function getPreYear()
+	{
+		$this->_year--;
+	}
+	public function getNextYear()
+	{
+		$this->_year++;
+	}
+	
+	
+	
+}
+?>
+<html>
+    <head>
+        <title>日历demo</title>
+        <meta http-equiv="Content-Type" content="text/html" charset="UTF-8" />
+        <style>
+        	.calendertablecss td
+        	{
+        		width:40px;
+        		padding:0px 5px;
+        		text-align:center;
+        	}
+        </style>
+    </head>
+    <body>
+        <div style="align:center">
+            <?php
+            	
+                $obj = new Calendar();
+				$obj->setTime(2016, 9);
+				//$obj->getNextMonth();
+				$obj->print();
+            ?>    
+        </div>
+    </body>
+</html>
+
