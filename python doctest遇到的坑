@@ -1,0 +1,19 @@
+版本Python3.5
+OS windows 10
+
+python doctest例子
+def is_between(v, lower, higher):
+    '''demo of doctest
+    >>> is_between(5,1,9)    
+    True
+    >>> is_between(3,3,9)
+    False
+    '''
+    return lower<v<higher
+
+if __name__=='__main__':
+    import doctest
+    doctest.testmod(verbose=True)
+
+在>>>后面有一个空格，不能多也不能少
+True后面不能有字符
