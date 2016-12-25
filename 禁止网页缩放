@@ -1,0 +1,28 @@
+control + ('-','+') 或者 ctrl + 鼠标滚轮
+<script type="text/javascript">
+    	 var scrollFunc=function(e){
+		  e=e || window.event;
+		  if(e.wheelDelta && event.ctrlKey){
+		   event.returnValue=false;
+		  }else if(e.detail){
+		   event.returnValue=false;
+		  }
+		 }
+		 if(document.addEventListener){
+		 		document.addEventListener('DOMMouseScroll',scrollFunc,false);
+		 }
+		 var keydownFunc = function(e)
+		 {
+		 	
+		 	e = e || window.event;
+		 	var keycode = e.keyCode;       
+  
+	         if(e.ctrlKey && keycode == 187 || e.ctrlKey && keycode == 189){      
+	            e.preventDefault();  
+	            window.event.returnValue = false;    
+	         }  
+		 }
+		 
+		 window.onmousewheel=document.onmousewheel=scrollFunc;
+		 window.onkeydown=document.onkeydown=keydownFunc;
+    </script>
