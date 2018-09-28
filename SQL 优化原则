@@ -474,3 +474,4 @@ SQL Server查询分析器是你的好伙伴，通过它你可以了解查询和�
 第二种格式是使用EXIST操作符:
 
 ... where exists (select 'X' from ...where ...);
+    //TODO:那种更高效呢？
